@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+
+{% block title %}Trade #CP{{ trade.id }} | ChainPort{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+
+<div class="layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <h2><a href="{{ url_for('main.dashboard') }}">ChainPort</a></h2>
+        <nav>
+            <a href="{{ url_for('main.dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('main.trades') }}">My Trades</a>
+            <a href="{{ url_for('main.marketplace') }}">Marketplace</a>
+            <a href="{{ url_for('main.escrow') }}">Escrow Wallet</a>
+            <a href="{{ url_for('main.messages') }}">Messages</a>
+            <a class="logout" href="{{ url_for('auth.logout') }}">Logout</a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main">
+
+        <header class="topbar">
+            <h3>Trade #CP{{ trade.id }}</h3>
+            <span class="status {{ trade.status or 'unknown' }}">{{ (trade.status or 'unknown').replace('_', ' ').title() }}</span>
+        </header>
+
+        <section class="trade-detail-section">
+            <div class="trade-info">
+                <div class="trade-parties">
+                    <div class="party">
+                        <h4>Buyer</h4>
+                        <p>{{ trade.buyer.company_name or trade.buyer.full_name if trade.buyer else 'Unknown Buyer' }}</p>
+                        <p>{{ trade.buyer.email if trade.buyer else 'No email' }}</p>
+                    </div>
+                    <div class="party">
+                        <h4>Seller</h4>
+                        <p>{{ trade.seller.company_name or trade.seller.full_name if trade.seller else 'Unknown Seller' }}</p>
+                        <p>{{ trade.seller.email if trade.seller else 'No email' }}</p>
+                    </div>
+                </div>
+
+                <div class="trade-details">
+                    <h4>Trade Details</h4>
+                    {% if trade.product %}
+                    <p><strong>Product:</strong> {{ trade.product.title }}</p>
+                    {% endif %}
+                    <p><strong>Quantity:</strong> {{ trade.quantity }} {{ trade.unit or 'units' }}</p>
+                    <p><strong>Unit Price:</strong> ₹{{ "%.2f"|format(trade.price_per_unit) }}</p>
+                    <p><strong>Total Amount:</strong> ₹{{ "%.2f"|format(trade.total_amount) }}</p>
+                    <p><strong>Currency:</strong> {{ trade.currency or 'INR' }}</p>
+                    {% if trade.payment_terms %}
+                    <p><strong>Payment Terms:</strong> {{ trade.payment_terms }}</p>
+                    {% endif %}
+                    {% if trade.delivery_terms %}
+                    <p><strong>Delivery Terms:</strong> {{ trade.delivery_terms }}</p>
+                    {% endif %}
+                    {% if trade.delivery_date %}
+                    <p><strong>Delivery Date:</strong> {{ trade.delivery_date.strftime('%Y-%m-%d') if trade.delivery_date else 'Not set' }}</p>
+                    {% endif %}
+                    <p><strong>Created:</strong> {{ trade.created_at.strftime('%Y-%m-%d %H:%M') if trade.created_at else 'Unknown' }}</p>
+                </div>
+
+                {% if trade.escrow_amount > 0 %}
+                <div class="escrow-info">
+                    <h4>Escrow Information</h4>
+                    <p><strong>Escrow Amount:</strong> ₹{{ "%.2f"|format(trade.escrow_amount) }}</p>
+                </div>
+                {% endif %}
+
+                {% if trade.notes %}
+                <div class="trade-notes">
+                    <h4>Notes</h4>
+                    <p>{{ trade.notes }}</p>
+                </div>
+                {% endif %}
+            </div>
+
+                {% if trade.status == 'pending' and trade.buyer_id == current_user.id %}
+                <button class="btn-primary" data-trade-id="{{ trade.id }}" data-amount="{{ trade.total_amount|tojson }}" onclick="depositEscrow(this)" aria-label="Deposit escrow funds for this trade">Deposit to Escrow</button>
+                {% endif %}
+
+                {% if trade.status == 'escrow_deposited' and trade.seller_id == current_user.id %}
+                <button class="btn-success" data-trade-id="{{ trade.id }}" onclick="releaseEscrow(this)" aria-label="Release escrow funds to buyer">Release Escrow</button>
+                {% endif %}
+
+                {% if trade.status in ['pending', 'escrow_deposited'] %}
+                <button class="btn-warning" data-trade-id="{{ trade.id }}" onclick="updateStatus(this, 'cancelled')" aria-label="Cancel this trade">Cancel Trade</button>
+                {% endif %}
+        </section>
+
+        <!-- Messages Section -->
+        <section class="messages-section">
+            <h4>Messages</h4>
+
+            <div class="messages-list">
+                {% for message in messages %}
+                <div class="message {{ 'sent' if message.sender_id == current_user.id else 'received' }}">
+                    <div class="message-header">
+                        <strong>{{ message.sender.company_name or message.sender.full_name if message.sender else 'Unknown User' }}</strong>
+                        <span class="timestamp">{{ message.timestamp.strftime('%Y-%m-%d %H:%M') if message.timestamp else 'Unknown Time' }}</span>
+                    </div>
+                    {% if message.subject %}
+                    <div class="message-subject">{{ message.subject }}</div>
+                    {% endif %}
+                    <div class="message-content">{{ message.content or '' }}</div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <form class="message-form" method="POST" action="{{ url_for('main.send_message') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="receiver_id" value="{{ trade.buyer_id if trade.seller_id == current_user.id else trade.seller_id }}">
+                <input type="hidden" name="trade_id" value="{{ trade.id }}">
+                <div class="form-group">
+                    <label for="message-subject">Subject (Optional)</label>
+                    <input type="text" id="message-subject" name="subject" placeholder="Subject (optional)">
+                </div>
+                <div class="form-group">
+                    <label for="message-content">Message</label>
+                    <textarea id="message-content" name="content" placeholder="Type your message..." required></textarea>
+                </div>
+                <button type="submit" class="btn-primary" aria-label="Send message">Send Message</button>
+            </form>
+        </section>
+
+    </main>
+</div>
+
+<script>
+function depositEscrow(button) {
+    const tradeId = button.dataset.tradeId;
+    const amount = parseFloat(button.dataset.amount);
+    if (confirm(`Deposit $?{amount.toFixed(2)} to escrow for this trade?`)) {
+        fetch(`/api/trade/?{tradeId}/escrow`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ action: 'deposit', amount: amount })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            alert('Network error: ' + error.message);
+        });
+    }
+}
+
+function releaseEscrow(button) {
+    const tradeId = button.dataset.tradeId;
+    if (confirm('Release escrow funds to the seller? This action cannot be undone.')) {
+        fetch(`/api/trade/?{tradeId}/escrow`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ action: 'release' })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            alert('Network error: ' + error.message);
+        });
+    }
+}
+
+function updateStatus(button, status) {
+    const tradeId = button.dataset.tradeId;
+    const confirmMsg = status === 'cancelled' ? 'Cancel this trade?' : `Change status to ?{status}?`;
+    if (confirm(confirmMsg)) {
+        fetch(`/api/trade/?{tradeId}/status`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ status: status })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            alert('Network error: ' + error.message);
+        });
+    }
+}
+</script>
+{% endblock %}

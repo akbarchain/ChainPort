@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}{{ product.title }} | ChainPort{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/marketplace.css') }}">
+
+<div class="layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <h2><a href="{{ url_for('main.dashboard') }}">ChainPort</a></h2>
+        <nav>
+            <a href="{{ url_for('main.dashboard') }}">Dashboard</a>
+            <a class="active" href="{{ url_for('main.marketplace') }}">Marketplace</a>
+            <a href="{{ url_for('main.trades') }}">My Trades</a>
+            <a href="{{ url_for('main.escrow') }}">Escrow Wallet</a>
+            <a href="{{ url_for('main.messages') }}">Messages</a>
+            <a class="logout" href="{{ url_for('auth.logout') }}">Logout</a>
+        </nav>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+
+        <!-- Product Header -->
+        <header class="product-header">
+            <h2>{{ product.title }}</h2>
+            <div class="product-meta">
+                <span class="seller">Sold by: {{ product.seller.company_name or product.seller.email }}</span>
+                <span class="category">{{ product.category or 'Uncategorized' }}</span>
+                {% if product.hs_code %}
+                <span class="hs-code">HS Code: {{ product.hs_code }}</span>
+                {% endif %}
+            </div>
+        </header>
+
+        <!-- Product Details -->
+        <section class="product-details">
+            <div class="product-info">
+                <div class="price-section">
+                    <h3>₹{{ "%.2f"|format(product.price_per_unit) }} per {{ product.unit }}</h3>
+                    {% if product.min_order_quantity %}
+                    <p class="min-order">Minimum Order: {{ product.min_order_quantity }} {{ product.unit }}</p>
+                    {% endif %}
+                </div>
+
+                <div class="product-description">
+                    <h4>Description</h4>
+                    <p>{{ product.description or 'No description provided.' }}</p>
+                </div>
+
+                <div class="product-specs">
+                    <h4>Specifications</h4>
+                    <dl>
+                        <dt>Quantity Available:</dt>
+                        <dd>{{ product.quantity }} {{ product.unit }}</dd>
+
+                        <dt>Country of Origin:</dt>
+                        <dd>{{ product.country_of_origin or 'Not specified' }}</dd>
+
+                        <dt>Payment Terms:</dt>
+                        <dd>{{ product.payment_terms or 'Not specified' }}</dd>
+
+                        <dt>Delivery Terms:</dt>
+                        <dd>{{ product.delivery_terms or 'Not specified' }}</dd>
+                    </dl>
+                </div>
+
+                <div class="seller-info">
+                    <h4>About the Seller</h4>
+                    <p><strong>{{ product.seller.company_name or 'Individual Seller' }}</strong></p>
+                    <p>{{ product.seller.email }}</p>
+                    {% if product.seller.phone %}
+                    <p>Phone: {{ product.seller.phone }}</p>
+                    {% endif %}
+                    <p>Member since: {{ product.seller.created_at.strftime('%B %Y') }}</p>
+                </div>
+            </div>
+
+            <div class="product-actions">
+                {% if current_user.id != product.seller_id %}
+                <a href="{{ url_for('main.create_trade', product_id=product.id) }}" class="btn-primary">Request Trade</a>
+                {% else %}
+                <p class="own-product">This is your product listing.</p>
+                {% endif %}
+
+                <a href="{{ url_for('main.marketplace') }}" class="btn-secondary">Back to Marketplace</a>
+            </div>
+        </section>
+
+    </main>
+</div>
+{% endblock %}

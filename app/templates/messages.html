@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Messages | ChainPort{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+
+<div class="layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <h2><a href="{{ url_for('main.dashboard') }}">ChainPort</a></h2>
+        <nav>
+            <a href="{{ url_for('main.dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('main.profile') }}">Business Profile</a>
+            <a href="{{ url_for('main.kyc') }}">KYC Verification</a>
+            <a href="{{ url_for('main.marketplace') }}">Marketplace</a>
+            <a href="{{ url_for('main.trades') }}">My Trades</a>
+            <a href="{{ url_for('main.escrow') }}">Escrow Wallet</a>
+            <a class="active" href="{{ url_for('main.messages') }}">Messages</a>
+            <a href="{{ url_for('main.settings') }}">Settings</a>
+            <a class="logout" href="{{ url_for('auth.logout') }}">Logout</a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main">
+
+        <header class="topbar">
+            <h3>Messages</h3>
+        </header>
+
+        <section class="messages-section">
+            <div class="messages-list">
+                <h4>Conversations</h4>
+                {% if conversations %}
+                <div class="conversations">
+                    {% for conv in conversations %}
+                    <div class="conversation-item">
+                        <a href="{{ url_for('main.conversation', user_id=conv.user.id) }}">
+                            <div class="conversation-info">
+                                <h5>{{ conv.user.company_name or conv.user.full_name }}</h5>
+                                <p>{{ conv.user.email }}</p>
+                                {% if conv.last_message %}
+                                <small>Last message: {{ conv.last_message.timestamp.strftime('%Y-%m-%d %H:%M') }}</small>
+                                {% endif %}
+                            </div>
+                            {% if conv.last_message and not conv.last_message.is_read and conv.last_message.receiver_id == current_user.id %}
+                            <span class="unread-indicator"></span>
+                            {% endif %}
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="conversation">
+                    <p>No messages yet. Start trading to connect with verified partners!</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="message-thread">
+                <h4>Message Thread</h4>
+                <div class="thread-content">
+                    <p>Select a conversation to view messages.</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+</div>
+{% endblock %}

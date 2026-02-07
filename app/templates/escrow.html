@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Escrow Wallet | ChainPort{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+
+<div class="layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <h2><a href="{{ url_for('main.dashboard') }}">ChainPort</a></h2>
+        <nav>
+            <a href="{{ url_for('main.dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('main.profile') }}">Business Profile</a>
+            <a href="{{ url_for('main.kyc') }}">KYC Verification</a>
+            <a href="{{ url_for('main.marketplace') }}">Marketplace</a>
+            <a href="{{ url_for('main.trades') }}">My Trades</a>
+            <a class="active" href="{{ url_for('main.escrow') }}">Escrow Wallet</a>
+            <a href="{{ url_for('main.messages') }}">Messages</a>
+            <a href="{{ url_for('main.settings') }}">Settings</a>
+            <a class="logout" href="{{ url_for('auth.logout') }}">Logout</a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main">
+
+        <header class="topbar">
+            <h3>Escrow Wallet</h3>
+        </header>
+
+        <section class="escrow-section">
+            <div class="balance-card">
+                <h4>Current Escrow Balance</h4>
+                <p class="balance">₹{{ "%.2f"|format(user.escrow_balance) }}</p>
+            </div>
+
+            <div class="escrow-actions">
+                <button class="btn-primary" onclick="showDepositForm()">Deposit Funds</button>
+                <button class="btn-secondary" onclick="showWithdrawForm()">Withdraw Funds</button>
+            </div>
+
+            <div id="deposit-form" class="action-form" style="display: none;">
+                <h4>Deposit Funds</h4>
+                <form method="POST" action="{{ url_for('main.escrow_deposit') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <div class="form-group">
+                        <label for="deposit-amount">Amount ($)</label>
+                        <input type="number" id="deposit-amount" name="amount" step="0.01" min="0.01" required>
+                    </div>
+                    <button type="submit" class="btn-primary">Deposit</button>
+                    <button type="button" onclick="hideForms()">Cancel</button>
+                </form>
+            </div>
+
+            <div id="withdraw-form" class="action-form" style="display: none;">
+                <h4>Withdraw Funds</h4>
+                <form method="POST" action="{{ url_for('main.escrow_withdraw') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <div class="form-group">
+                        <label for="withdraw-amount">Amount ($)</label>
+                        <input type="number" id="withdraw-amount" name="amount" step="0.01" min="0.01" max="{{ user.escrow_balance }}" required>
+                    </div>
+                    <button type="submit" class="btn-primary">Withdraw</button>
+                    <button type="button" onclick="hideForms()">Cancel</button>
+                </form>
+            </div>
+
+            <h4>Escrow Transactions</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Transaction ID</th>
+                        <th>Type</th>
+                        <th>Amount</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for transaction in transactions %}
+                    <tr>
+                        <td>#ET{{ transaction.id }}</td>
+                        <td>{{ transaction.transaction_type.title() }}</td>
+                        <td>₹{{ "%.2f"|format(transaction.amount) }}</td>
+                        <td>{{ transaction.created_at.strftime('%Y-%m-%d') }}</td>
+                        <td class="status {{ transaction.status }}">{{ transaction.status.title() }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </section>
+                        <th>Status</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>No transactions yet</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>-</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+    </main>
+</div>
+
+<script>
+function showDepositForm() {
+    hideForms();
+    document.getElementById('deposit-form').style.display = 'block';
+}
+
+function showWithdrawForm() {
+    hideForms();
+    document.getElementById('withdraw-form').style.display = 'block';
+}
+
+function hideForms() {
+    document.getElementById('deposit-form').style.display = 'none';
+    document.getElementById('withdraw-form').style.display = 'none';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Register | ChainPort{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+
+<div class="auth-container">
+    <h2>Create Account</h2>
+    <p>Register your business on ChainPort</p>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <p style="color: {% if category == 'error' %}red{% else %}green{% endif %}; margin-bottom: 15px; font-weight: bold;">{{ message }}</p>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+    <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <label>First Name</label>
+        <input type="text" name="first_name" placeholder="Your First Name" required>
+
+        <label>Last Name</label>
+        <input type="text" name="last_name" placeholder="Your Last Name" required>
+
+        <label>Company Name</label>
+        <input type="text" name="company_name" placeholder="Your Business Name" required>
+
+        <label>Email Address</label>
+        <input type="email" name="email" placeholder="business@email.com" required>
+
+        <label>Phone</label>
+        <input type="tel" name="phone" placeholder="Your Phone Number">
+
+        <label>Password</label>
+        <input type="password" name="password" placeholder="••••••••" required>
+
+        <button type="submit">Create Account</button>
+    </form>
+
+    <div class="auth-links">
+        <p>Already have an account? <a href="/login">Login</a></p>
+    </div>
+</div>
+
+{% endblock %}
+

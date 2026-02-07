@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}My Trades | ChainPort{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+
+<div class="layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <h2><a href="{{ url_for('main.dashboard') }}">ChainPort</a></h2>
+        <nav>
+            <a href="{{ url_for('main.dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('main.profile') }}">Business Profile</a>
+            <a href="{{ url_for('main.kyc') }}">KYC Verification</a>
+            <a href="{{ url_for('main.marketplace') }}">Marketplace</a>
+            <a class="active" href="{{ url_for('main.trades') }}">My Trades</a>
+            <a href="{{ url_for('main.escrow') }}">Escrow Wallet</a>
+            <a href="{{ url_for('main.messages') }}">Messages</a>
+            <a href="{{ url_for('main.settings') }}">Settings</a>
+            <a class="logout" href="{{ url_for('auth.logout') }}">Logout</a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main">
+
+        <header class="topbar">
+            <h3>My Trades</h3>
+        </header>
+
+        <section class="table-section">
+            <h4>All Trades</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Trade ID</th>
+                        <th>Counterparty</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Amount</th>
+                        <th>Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for trade in trades %}
+                    <tr>
+                        <td><a href="{{ url_for('main.trade_detail', trade_id=trade.id) }}">#CP{{ trade.id }}</a></td>
+                        <td>{% if trade.buyer_id == current_user.id %}{{ trade.seller.company_name or trade.seller.full_name }}{% else %}{{ trade.buyer.company_name or trade.buyer.full_name }}{% endif %}</td>
+                        <td>{% if trade.buyer_id == current_user.id %}Buyer{% else %}Seller{% endif %}</td>
+                        <td class="status {{ trade.status }}">{{ trade.status.replace('_', ' ').title() }}</td>
+                        <td>₹{{ "%.2f"|format(trade.total_amount) }}</td>
+                        <td>{{ trade.created_at.strftime('%Y-%m-%d') }}</td>
+                        <td><a href="{{ url_for('main.trade_detail', trade_id=trade.id) }}" class="action-link">View Details</a></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </section>
+
+    </main>
+</div>
+{% endblock %}

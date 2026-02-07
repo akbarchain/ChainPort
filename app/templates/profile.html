@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Profile | ChainPort{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+
+<div class="layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <h2><a href="{{ url_for('main.dashboard') }}">ChainPort</a></h2>
+        <nav>
+            <a href="{{ url_for('main.dashboard') }}">Dashboard</a>
+            <a class="active" href="{{ url_for('main.profile') }}">Business Profile</a>
+            <a href="{{ url_for('main.kyc') }}">KYC Verification</a>
+            <a href="{{ url_for('main.marketplace') }}">Marketplace</a>
+            <a href="{{ url_for('main.trades') }}">My Trades</a>
+            <a href="{{ url_for('main.escrow') }}">Escrow Wallet</a>
+            <a href="{{ url_for('main.messages') }}">Messages</a>
+            <a href="{{ url_for('main.settings') }}">Settings</a>
+            <a class="logout" href="{{ url_for('auth.logout') }}">Logout</a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main">
+
+        <header class="topbar">
+            <h3>Business Profile</h3>
+        </header>
+
+        <section class="profile-section">
+            <h4>Company Information</h4>
+            <div class="profile-info">
+                <p><strong>Company Name:</strong> {{ user.company_name or 'Not provided' }}</p>
+                <p><strong>Email:</strong> {{ user.email }}</p>
+                <p><strong>Phone:</strong> {{ user.phone or 'Not provided' }}</p>
+                <p><strong>Verification Status:</strong> <span class="status {{ 'verified' if user.is_verified else 'pending' }}">{{ 'Verified' if user.is_verified else 'Pending' }}</span></p>
+                <p><strong>Member Since:</strong> {{ user.created_at.strftime('%B %Y') }}</p>
+            </div>
+        </section>
+
+    </main>
+</div>
+{% endblock %}

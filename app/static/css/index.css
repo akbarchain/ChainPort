@@ -1,0 +1,437 @@
+/* -----------------------------
+   GLOBAL RESET & BASE STYLES
+------------------------------ */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Roboto', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #fff;
+    color: #202124;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* -----------------------------
+   NAVBAR
+------------------------------ */
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 24px;
+    background: #fff;
+    border-bottom: 1px solid #e8eaed;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.logo {
+    font-size: 20px;
+    font-weight: 400;
+    color: #4285f4;
+    letter-spacing: -0.5px;
+}
+
+.navbar nav {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+}
+
+.navbar nav a {
+    text-decoration: none;
+    color: #5f6368;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 8px 12px;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+}
+
+.navbar nav a:hover {
+    background-color: #f1f3f4;
+}
+
+.btn-outline {
+    padding: 8px 16px;
+    border: 1px solid #4285f4;
+    color: #4285f4;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.btn-outline:hover {
+    background-color: #4285f4;
+    color: white;
+}
+
+/* -----------------------------
+   HERO SECTION
+------------------------------ */
+.hero {
+    text-align: center;
+    padding: 120px 24px;
+    background: #fff;
+    color: #202124;
+}
+
+.hero h1 {
+    font-size: 56px;
+    font-weight: 300;
+    margin-bottom: 24px;
+    line-height: 1.2;
+    letter-spacing: -1px;
+}
+
+.hero p {
+    max-width: 600px;
+    margin: 0 auto 48px;
+    font-size: 20px;
+    color: #5f6368;
+    line-height: 1.6;
+}
+
+.hero-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.btn-primary, .btn-secondary {
+    padding: 12px 24px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 16px;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 48px;
+}
+
+.btn-primary {
+    background: #4285f4;
+    color: white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.btn-primary:hover {
+    background: #3367d6;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.btn-secondary {
+    border: 1px solid #dadce0;
+    color: #3c4043;
+    background: #fff;
+}
+
+.btn-secondary:hover {
+    background: #f8f9fa;
+    border-color: #bdc1c6;
+}
+
+/* -----------------------------
+   FEATURES SECTION
+------------------------------ */
+.features {
+    padding: 96px 24px;
+    background: #f8f9fa;
+}
+
+.features h2 {
+    text-align: center;
+    font-size: 36px;
+    font-weight: 300;
+    color: #202124;
+    margin-bottom: 64px;
+}
+
+.feature-grid {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 32px;
+}
+
+.feature-card {
+    background: #fff;
+    padding: 32px;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    border: 1px solid #e8eaed;
+    transition: box-shadow 0.2s ease;
+}
+
+.feature-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.feature-card h3 {
+    font-size: 24px;
+    font-weight: 400;
+    color: #202124;
+    margin-bottom: 16px;
+}
+
+.feature-card p {
+    color: #5f6368;
+    font-size: 16px;
+    line-height: 1.6;
+}
+
+/* -----------------------------
+   HOW IT WORKS SECTION
+------------------------------ */
+.how-it-works {
+    padding: 96px 24px;
+    background: #fff;
+}
+
+.how-it-works h2 {
+    text-align: center;
+    font-size: 36px;
+    font-weight: 300;
+    color: #202124;
+    margin-bottom: 64px;
+}
+
+.how-grid {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 48px;
+}
+
+.step {
+    text-align: center;
+}
+
+.step-number {
+    width: 48px;
+    height: 48px;
+    background: #4285f4;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 500;
+    margin: 0 auto 24px;
+}
+
+.step h3 {
+    font-size: 20px;
+    font-weight: 500;
+    color: #202124;
+    margin-bottom: 16px;
+}
+
+.step p {
+    color: #5f6368;
+    font-size: 16px;
+    line-height: 1.6;
+}
+
+/* -----------------------------
+   TRUST SECTION
+------------------------------ */
+.trust {
+    padding: 96px 24px;
+    background: #f8f9fa;
+    text-align: center;
+}
+
+.trust h2 {
+    font-size: 36px;
+    font-weight: 300;
+    color: #202124;
+    margin-bottom: 32px;
+}
+
+.trust p {
+    max-width: 600px;
+    margin: 0 auto 48px;
+    font-size: 18px;
+    color: #5f6368;
+    line-height: 1.6;
+}
+
+.trust-stats {
+    display: flex;
+    justify-content: center;
+    gap: 64px;
+    flex-wrap: wrap;
+}
+
+.stat {
+    text-align: center;
+}
+
+.stat-number {
+    font-size: 48px;
+    font-weight: 300;
+    color: #4285f4;
+    display: block;
+}
+
+.stat-label {
+    font-size: 16px;
+    color: #5f6368;
+    margin-top: 8px;
+}
+
+/* -----------------------------
+   FOOTER
+------------------------------ */
+.footer {
+    padding: 48px 24px;
+    background: #fff;
+    border-top: 1px solid #e8eaed;
+    text-align: center;
+}
+
+.footer p {
+    color: #5f6368;
+    font-size: 14px;
+}
+
+/* -----------------------------
+   RESPONSIVE DESIGN
+------------------------------ */
+@media (max-width: 768px) {
+    .navbar {
+        padding: 12px 16px;
+    }
+
+    .navbar nav {
+        gap: 16px;
+    }
+
+    .hero {
+        padding: 80px 16px;
+    }
+
+    .hero h1 {
+        font-size: 36px;
+    }
+
+    .hero p {
+        font-size: 18px;
+    }
+
+    .hero-buttons {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .features, .how-it-works, .trust {
+        padding: 64px 16px;
+    }
+
+    .feature-grid, .how-grid {
+        grid-template-columns: 1fr;
+        gap: 24px;
+    }
+
+    .trust-stats {
+        gap: 32px;
+    }
+}
+.features {
+    padding: 80px 60px;
+    text-align: center;
+}
+
+.features h2 {
+    font-size: 32px;
+    margin-bottom: 40px;
+    color: #0f766e;
+}
+
+.feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 22px;
+}
+
+.feature-card {
+    background: white;
+    padding: 28px;
+    border-radius: 14px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+}
+
+/* -----------------------------
+   HOW IT WORKS SECTION
+------------------------------ */
+.how-it-works {
+    background: #eefdf9;
+    padding: 80px 40px;
+    text-align: center;
+}
+
+.how-it-works h2 {
+    margin-bottom: 30px;
+    color: #0f766e;
+}
+
+.steps {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 18px;
+}
+
+.step {
+    background: white;
+    padding: 20px 30px;
+    border-radius: 10px;
+    font-weight: bold;
+    min-width: 160px;
+}
+
+/* -----------------------------
+   TRUST SECTION
+------------------------------ */
+.trust {
+    padding: 80px 40px;
+    text-align: center;
+}
+
+.trust h2 {
+    margin-bottom: 14px;
+    color: #0f766e;
+}
+
+/* -----------------------------
+   FOOTER
+------------------------------ */
+.footer {
+    background: #0f766e;
+    color: white;
+    text-align: center;
+    padding: 22px;
+    margin-top: 40px;
+}
+
+.footer-links a {
+    color: #ccfbf1;
+    margin: 0 12px;
+    text-decoration: none;
+    font-size: 14px;
+}

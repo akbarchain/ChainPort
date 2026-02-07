@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard | ChainPort{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+
+<div class="layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <h2><a href="{{ url_for('main.dashboard') }}">ChainPort</a></h2>
+        <nav>
+            <a class="active" href="{{ url_for('main.dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('main.profile') }}">Business Profile</a>
+            <a href="{{ url_for('main.kyc') }}">KYC Verification</a>
+            <a href="{{ url_for('main.marketplace') }}">Marketplace</a>
+            <a href="{{ url_for('main.trades') }}">My Trades</a>
+            <a href="{{ url_for('main.escrow') }}">Escrow Wallet</a>
+            <a href="{{ url_for('main.messages') }}">Messages</a>
+            <a href="{{ url_for('main.settings') }}">Settings</a>
+            <a class="logout" href="{{ url_for('auth.logout') }}">Logout</a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main">
+
+        <!-- Top Bar -->
+        <header class="topbar">
+            <h3>Welcome, {{ user.company_name or user.email }}</h3>
+            <span class="status verified">Verified</span>
+        </header>
+
+        <!-- Stats Cards -->
+        <section class="stats">
+            <div class="card">
+                <h4>Active Trades</h4>
+                <p>{{ active_trades }}</p>
+            </div>
+            <div class="card">
+                <h4>Escrow Balance</h4>
+                <p>₹{{ "%.2f"|format(user.escrow_balance) }}</p>
+            </div>
+            <div class="card">
+                <h4>Total Deals</h4>
+                <p>{{ total_deals }}</p>
+            </div>
+            <div class="card">
+                <h4>Completed Deals</h4>
+                <p>{{ completed_trades }}</p>
+            </div>
+        </section>
+                <p>0</p>
+            </div>
+        </section>
+
+        <!-- Recent Trades -->
+        <section class="table-section">
+            <h3>Recent Trades</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Trade ID</th>
+                        <th>Counterparty</th>
+                        <th>Status</th>
+                        <th>Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for trade in trades %}
+                    <tr>
+                        <td>#CP{{ trade.id }}</td>
+                        <td>{% if trade.buyer_id == user.id %}{{ trade.seller.company_name }}{% else %}{{ trade.buyer.company_name }}{% endif %}</td>
+                        <td class="status {{ 'pending' if trade.status == 'pending' else 'success' }}">{{ trade.status.title() }}</td>
+                        <td>₹{{ "%.2f"|format(trade.total_amount) }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </section>
+
+    </main>
+</div>
+{% endblock %}

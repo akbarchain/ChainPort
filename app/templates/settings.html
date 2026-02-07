@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}Settings | ChainPort{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+
+<div class="layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <h2><a href="{{ url_for('main.dashboard') }}">ChainPort</a></h2>
+        <nav>
+            <a href="{{ url_for('main.dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('main.profile') }}">Business Profile</a>
+            <a href="{{ url_for('main.kyc') }}">KYC Verification</a>
+            <a href="{{ url_for('main.marketplace') }}">Marketplace</a>
+            <a href="{{ url_for('main.trades') }}">My Trades</a>
+            <a href="{{ url_for('main.escrow') }}">Escrow Wallet</a>
+            <a href="{{ url_for('main.messages') }}">Messages</a>
+            <a class="active" href="{{ url_for('main.settings') }}">Settings</a>
+            <a class="logout" href="{{ url_for('auth.logout') }}">Logout</a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main">
+
+        <header class="topbar">
+            <h3>Settings</h3>
+        </header>
+
+        <section class="settings-section">
+            <h4>Account Settings</h4>
+            <form class="settings-form" method="POST" action="{{ url_for('main.settings') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="action" value="update_profile">
+                <label>Company Name</label>
+                <input type="text" value="{{ user.company_name or '' }}">
+
+                <label>Email</label>
+                <input type="email" value="{{ user.email }}">
+
+                <label>Phone</label>
+                <input type="tel" value="{{ user.phone or '' }}">
+
+                <button type="submit">Update Profile</button>
+            </form>
+
+            <h4>Security</h4>
+            <form class="settings-form" method="POST" action="{{ url_for('main.settings') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="action" value="change_password">
+                <label>Current Password</label>
+                <input type="password" name="current_password" required>
+
+                <label>New Password</label>
+                <input type="password" name="new_password" required>
+
+                <label>Confirm New Password</label>
+                <input type="password" name="confirm_password" required>
+
+                <button type="submit">Change Password</button>
+            </form>
+
+            <h4>Notifications</h4>
+            <div class="notification-settings">
+                <label><input type="checkbox" checked> Email notifications for new trades</label>
+                <label><input type="checkbox" checked> Email notifications for messages</label>
+            </div>
+        </section>
+
+    </main>
+</div>
+{% endblock %}

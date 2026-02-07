@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}KYC Verification | ChainPort{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+
+<div class="layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <h2><a href="{{ url_for('main.dashboard') }}">ChainPort</a></h2>
+        <nav>
+            <a href="{{ url_for('main.dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('main.profile') }}">Business Profile</a>
+            <a class="active" href="{{ url_for('main.kyc') }}">KYC Verification</a>
+            <a href="{{ url_for('main.marketplace') }}">Marketplace</a>
+            <a href="{{ url_for('main.trades') }}">My Trades</a>
+            <a href="{{ url_for('main.escrow') }}">Escrow Wallet</a>
+            <a href="{{ url_for('main.messages') }}">Messages</a>
+            <a href="{{ url_for('main.settings') }}">Settings</a>
+            <a class="logout" href="{{ url_for('auth.logout') }}">Logout</a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main">
+
+        <header class="topbar">
+            <h3>KYC Verification</h3>
+        </header>
+
+        <section class="kyc-section">
+            <h4>Know Your Customer Verification</h4>
+            <p>Complete your verification to access all ChainPort features.</p>
+            
+            <div class="verification-status">
+                <h5>Current Status: <span class="status pending">Pending</span></h5>
+            </div>
+
+            <form class="kyc-form" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <label>Business Registration Number</label>
+                <input type="text" placeholder="Enter registration number">
+
+                <label>Tax ID</label>
+                <input type="text" placeholder="Enter tax ID">
+
+                <label>Upload Business License</label>
+                <input type="file" accept=".pdf,.jpg,.png">
+
+                <label>Upload ID Document</label>
+                <input type="file" accept=".pdf,.jpg,.png">
+
+                <button type="submit">Submit for Verification</button>
+            </form>
+        </section>
+
+    </main>
+</div>
+{% endblock %}

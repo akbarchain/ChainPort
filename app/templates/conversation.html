@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}Messages with {{ other_user.company_name or other_user.full_name }} | ChainPort{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+
+<div class="layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <h2><a href="{{ url_for('main.dashboard') }}">ChainPort</a></h2>
+        <nav>
+            <a href="{{ url_for('main.dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('main.messages') }}">Messages</a>
+            <a href="{{ url_for('main.trades') }}">My Trades</a>
+            <a href="{{ url_for('main.marketplace') }}">Marketplace</a>
+            <a href="{{ url_for('main.escrow') }}">Escrow Wallet</a>
+            <a class="logout" href="{{ url_for('auth.logout') }}">Logout</a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main">
+
+        <header class="topbar">
+            <h3>Messages with {{ other_user.company_name or other_user.full_name }}</h3>
+        </header>
+
+        <section class="conversation-section">
+            <div class="conversation-header">
+                <div class="user-info">
+                    <h4>{{ other_user.company_name or other_user.full_name }}</h4>
+                    <p>{{ other_user.email }}</p>
+                </div>
+                <a href="{{ url_for('main.messages') }}" class="btn-secondary">Back to Messages</a>
+            </div>
+
+            <div class="messages-container">
+                {% for message in messages %}
+                <div class="message {{ 'sent' if message.sender_id == current_user.id else 'received' }}">
+                    <div class="message-header">
+                        <strong>{{ message.sender.company_name or message.sender.full_name }}</strong>
+                        <span class="timestamp">{{ message.timestamp.strftime('%Y-%m-%d %H:%M') }}</span>
+                    </div>
+                    {% if message.subject %}
+                    <div class="message-subject">{{ message.subject }}</div>
+                    {% endif %}
+                    <div class="message-content">{{ message.content }}</div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <form class="message-form" method="POST" action="{{ url_for('main.send_message') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="receiver_id" value="{{ other_user.id }}">
+                <input type="text" name="subject" placeholder="Subject (optional)">
+                <textarea name="content" placeholder="Type your message..." required></textarea>
+                <button type="submit" class="btn-primary">Send Message</button>
+            </form>
+        </section>
+
+    </main>
+</div>
+
+<style>
+.conversation-section {
+    max-width: 800px;
+}
+
+.conversation-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.user-info h4 {
+    margin: 0 0 5px 0;
+    color: #333;
+}
+
+.user-info p {
+    margin: 0;
+    color: #666;
+}
+
+.messages-container {
+    max-height: 500px;
+    overflow-y: auto;
+    margin-bottom: 20px;
+    padding: 15px;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    background: #fafafa;
+}
+
+.message {
+    margin-bottom: 15px;
+    padding: 12px;
+    border-radius: 8px;
+    max-width: 70%;
+}
+
+.message.sent {
+    margin-left: auto;
+    background: #007bff;
+    color: white;
+}
+
+.message.received {
+    margin-right: auto;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+}
+
+.message.sent .message-header strong {
+    color: #e3f2fd;
+}
+
+.message.received .message-header strong {
+    color: #495057;
+}
+
+.message-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.message-subject {
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.message-content {
+    line-height: 1.4;
+}
+
+.message-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.message-form input[type="text"],
+.message-form textarea {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: inherit;
+}
+
+.message-form textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+.message-form button {
+    align-self: flex-start;
+    padding: 10px 20px;
+}
+</style>
+{% endblock %}
