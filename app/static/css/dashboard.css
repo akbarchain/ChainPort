@@ -40,10 +40,32 @@ body {
     color: #4285f4;
     text-decoration: none;
     transition: opacity 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 .sidebar h2 a:hover {
     opacity: 0.8;
+}
+
+.sidebar-logo {
+    font-weight: 500;
+    letter-spacing: 1px;
+}
+
+.logo-svg {
+    display: block;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-3px);
+    }
 }
 
 .sidebar nav a {

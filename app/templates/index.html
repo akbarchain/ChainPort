@@ -7,7 +7,10 @@
 
 <!-- Navbar -->
 <header class="navbar">
-    <div class="logo">ChainPort</div>
+    <div class="logo">
+        <img src="{{ url_for('static', filename='logo.svg') }}" alt="ChainPort Logo" class="logo-svg" width="45" height="45">
+        <span class="logo-text">ChainPort</span>
+    </div>
     <nav>
         <a href="#features">Features</a>
         <a href="#how">How it Works</a>

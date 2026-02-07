@@ -36,6 +36,28 @@ body {
     font-weight: 400;
     color: #4285f4;
     letter-spacing: -0.5px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.logo-svg {
+    display: block;
+    animation: float 3s ease-in-out infinite;
+}
+
+.logo-text {
+    font-weight: 500;
+    letter-spacing: 1px;
+}
+
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-3px);
+    }
 }
 
 .navbar nav {
