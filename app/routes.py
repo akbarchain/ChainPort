@@ -244,7 +244,7 @@ def escrow_deposit():
     db.session.add(transaction)
     db.session.commit()
 
-    flash(f"Successfully deposited ${amount:.2f} to your escrow wallet.", "success")
+    flash(f"Successfully deposited ₹{amount:.2f} to your escrow wallet.", "success")
     return redirect(url_for("main.escrow"))
 
 
@@ -275,7 +275,7 @@ def escrow_withdraw():
     db.session.add(transaction)
     db.session.commit()
 
-    flash(f"Successfully withdrew ${amount:.2f} from your escrow wallet.", "success")
+    flash(f"Successfully withdrew ₹{amount:.2f} from your escrow wallet.", "success")
     return redirect(url_for("main.escrow"))
 
 
