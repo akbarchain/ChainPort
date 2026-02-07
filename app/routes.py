@@ -19,6 +19,17 @@ from werkzeug.utils import secure_filename
 from app.models import User, Trade, Product, Message, EscrowTransaction, KYCDocument, db
 from app.extensions import csrf
 from app.escrow.simulator import EscrowSimulator
+import os
+import base64
+from flask import session
+
+# Optional PyNaCl import for ed25519 verification; wallet endpoints degrade if unavailable
+try:
+    import nacl.signing
+    _HAS_PYNACL = True
+except Exception:
+    nacl = None
+    _HAS_PYNACL = False
 
 main_bp = Blueprint("main", __name__)
 
@@ -508,3 +519,40 @@ def manage_escrow(trade_id):
         return jsonify({"error": "Internal error"}), 500
 
     return jsonify({"error": "Invalid action"}), 400
+
+
+@main_bp.route('/wallet/challenge')
+def wallet_challenge():
+    # generate a random challenge and store in session (base64 encoded)
+    challenge = base64.b64encode(os.urandom(32)).decode('ascii')
+    session['wallet_challenge'] = challenge
+    return jsonify({'challenge': challenge})
+
+
+@main_bp.route('/wallet/verify', methods=['POST'])
+def wallet_verify():
+    data = request.get_json() or {}
+    pub_b64 = data.get('public_key')
+    sig_b64 = data.get('signature')
+    challenge_b64 = session.get('wallet_challenge')
+
+    if not (pub_b64 and sig_b64 and challenge_b64):
+        return jsonify({'error': 'Missing fields or no challenge'}), 400
+
+    if not _HAS_PYNACL:
+        return jsonify({'error': 'Server missing PyNaCl for signature verification'}), 501
+
+    try:
+        pub_bytes = base64.b64decode(pub_b64)
+        sig_bytes = base64.b64decode(sig_b64)
+        challenge_bytes = base64.b64decode(challenge_b64)
+
+        verify_key = nacl.signing.VerifyKey(pub_bytes)
+        verify_key.verify(challenge_bytes, sig_bytes)
+
+    except Exception:
+        return jsonify({'error': 'Verification failed'}), 400
+
+    # mark wallet as connected in session
+    session['wallet_address'] = base64.b64encode(pub_bytes).decode('ascii')
+    return jsonify({'success': True})
