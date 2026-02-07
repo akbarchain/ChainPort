@@ -1,3 +1,6 @@
+from datetime import datetime
+import os
+
 from flask import (
     Blueprint,
     render_template,
@@ -10,11 +13,10 @@ from flask import (
     current_app,
 )
 from flask_login import login_required, current_user
+from werkzeug.utils import secure_filename
+
 from app.models import User, Trade, Product, Message, EscrowTransaction, KYCDocument, db
 from app.extensions import csrf
-from werkzeug.utils import secure_filename
-import os
-from datetime import datetime
 
 main_bp = Blueprint("main", __name__)
 
