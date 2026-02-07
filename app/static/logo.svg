@@ -1,47 +1,85 @@
-<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-  <!-- Background Circle (optional) -->
-  <circle cx="100" cy="100" r="95" fill="none" stroke="#E8F4F8" stroke-width="2"/>
-  
-  <!-- Chain Links (Blockchain concept) -->
-  <g id="chain">
-    <!-- Left Chain Link -->
-    <rect x="30" y="75" width="30" height="50" rx="15" fill="none" stroke="#0066CC" stroke-width="3"/>
-    <circle cx="45" cy="85" r="4" fill="#0066CC"/>
-    <circle cx="45" cy="115" r="4" fill="#0066CC"/>
-    
-    <!-- Middle Chain Link -->
-    <rect x="85" y="60" width="30" height="80" rx="15" fill="none" stroke="#00A3E0" stroke-width="3"/>
-    <circle cx="100" cy="70" r="4" fill="#00A3E0"/>
-    <circle cx="100" cy="130" r="4" fill="#00A3E0"/>
-    
-    <!-- Right Chain Link -->
-    <rect x="140" y="75" width="30" height="50" rx="15" fill="none" stroke="#0066CC" stroke-width="3"/>
-    <circle cx="155" cy="85" r="4" fill="#0066CC"/>
-    <circle cx="155" cy="115" r="4" fill="#0066CC"/>
-    
-    <!-- Connecting Lines -->
-    <line x1="60" y1="100" x2="85" y2="100" stroke="#0066CC" stroke-width="2.5"/>
-    <line x1="115" y1="100" x2="140" y2="100" stroke="#0066CC" stroke-width="2.5"/>
-  </g>
-  
-  <!-- Port/Ship Concept (Anchor-like shape at bottom) -->
-  <g id="port">
-    <!-- Port indicator - anchor-like -->
-    <path d="M 100 135 L 85 160 L 100 155 L 115 160 Z" fill="#00A3E0" stroke="#0066CC" stroke-width="1.5"/>
-    <circle cx="100" cy="135" r="5" fill="#00A3E0"/>
-  </g>
-  
-  <!-- Shield for Security -->
-  <g id="security" opacity="0.9">
-    <path d="M 100 30 L 130 45 L 130 70 Q 130 85 100 95 Q 70 85 70 70 L 70 45 Z" 
-          fill="none" stroke="#00D084" stroke-width="2"/>
-    <!-- Checkmark inside shield -->
-    <path d="M 88 75 L 96 83 L 112 62" 
-          fill="none" stroke="#00D084" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  </g>
-  
-  <!-- Text: ChainPort (optional - can be added if needed) -->
-  <text x="100" y="180" font-size="14" font-weight="600" text-anchor="middle" fill="#0066CC" letter-spacing="1">
-    CHAINPORT
-  </text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 240">
+
+<!-- ===== GRADIENTS ===== -->
+<defs>
+
+<!-- Globe gradient -->
+<radialGradient id="globeGrad" cx="40%" cy="35%" r="70%">
+    <stop offset="0%" stop-color="#7fd0de"/>
+    <stop offset="60%" stop-color="#2f8fb1"/>
+    <stop offset="100%" stop-color="#0f2f5f"/>
+</radialGradient>
+
+<!-- Ring gradient -->
+<linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#ffffff"/>
+    <stop offset="100%" stop-color="#cfd8df"/>
+</linearGradient>
+
+<!-- Chain metallic -->
+<linearGradient id="metal" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%" stop-color="#d8dde1"/>
+    <stop offset="50%" stop-color="#ffffff"/>
+    <stop offset="100%" stop-color="#8b949b"/>
+</linearGradient>
+
+</defs>
+
+<!-- ===== GLOBE ===== -->
+<circle cx="110" cy="120" r="90" fill="url(#globeGrad)"/>
+
+<!-- Latitude line -->
+<ellipse cx="110" cy="120" rx="90" ry="35"
+         fill="none" stroke="#9bd6e0" stroke-width="5"/>
+
+<!-- Meridian lines -->
+<ellipse cx="110" cy="120" rx="35" ry="90"
+         fill="none" stroke="#9bd6e0" stroke-width="5"/>
+<ellipse cx="110" cy="120" rx="60" ry="90"
+         fill="none" stroke="#9bd6e0" stroke-width="5"/>
+
+<!-- ===== ORBIT RING ===== -->
+<ellipse cx="110" cy="120" rx="115" ry="45"
+         fill="none"
+         stroke="url(#ringGrad)"
+         stroke-width="10"
+         transform="rotate(-15 110 120)"/>
+
+<!-- ===== ANCHOR ===== -->
+<path d="
+M110 70
+L110 170
+M110 70
+A12 12 0 1 1 110 71
+M70 165
+Q110 205 150 165
+"
+stroke="#0b2b59"
+stroke-width="10"
+fill="none"
+stroke-linecap="round"/>
+
+<!-- ===== CHAIN LINK ===== -->
+<g stroke="url(#metal)" stroke-width="8" fill="none">
+    <rect x="150" y="40" width="80" height="38" rx="19"/>
+    <rect x="190" y="70" width="80" height="38" rx="19"/>
+</g>
+
+<!-- ===== TEXT ===== -->
+<text x="300" y="130"
+      font-family="Segoe UI, Arial, sans-serif"
+      font-size="80"
+      font-weight="700"
+      fill="#193a6a">
+    ChainPort
+</text>
+
+<!-- Tagline -->
+<text x="305" y="175"
+      font-family="Segoe UI, Arial, sans-serif"
+      font-size="30"
+      fill="#7c8791">
+    Verified B2B Trade & Escrow
+</text>
+
 </svg>
