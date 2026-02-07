@@ -8,8 +8,10 @@
 <!-- Navbar -->
 <header class="navbar">
     <div class="logo">
-        <img src="{{ url_for('static', filename='logo.svg') }}" alt="ChainPort Logo" class="logo-svg" width="45" height="45">
-        <span class="logo-text">ChainPort</span>
+        <a href="{{ url_for('main.index') }}" class="logo-link">
+            <img src="{{ url_for('static', filename='logo.svg') }}" alt="ChainPort Logo" class="logo-svg" width="48" height="48">
+            <span class="logo-text">ChainPort</span>
+        </a>
     </div>
     <nav>
         <a href="#features">Features</a>
