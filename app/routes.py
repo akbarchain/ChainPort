@@ -18,6 +18,7 @@ from werkzeug.utils import secure_filename
 
 from app.models import User, Trade, Product, Message, EscrowTransaction, KYCDocument, db
 from app.extensions import csrf
+from app.escrow.simulator import EscrowSimulator
 
 main_bp = Blueprint("main", __name__)
 
@@ -231,23 +232,15 @@ def escrow_deposit():
     if amount <= 0:
         flash("Please enter a valid amount.", "error")
         return redirect(url_for("main.escrow"))
+    # In a real application, this would integrate with a payment gateway.
+    # Use simulator to perform and record the deposit.
+    sim = EscrowSimulator()
+    try:
+        sim.deposit_to_wallet(current_user, amount)
+        flash(f"Successfully deposited ₹{amount:.2f} to your escrow wallet.", "success")
+    except Exception as e:
+        flash(str(e), "error")
 
-    # In a real application, this would integrate with a payment gateway
-    # For now, we'll simulate a deposit
-    transaction = EscrowTransaction(
-        user_id=current_user.id,
-        transaction_type="deposit",
-        amount=amount,
-        status="completed",
-        notes="Manual deposit (simulated)",
-    )
-
-    current_user.escrow_balance += amount
-
-    db.session.add(transaction)
-    db.session.commit()
-
-    flash(f"Successfully deposited ₹{amount:.2f} to your escrow wallet.", "success")
     return redirect(url_for("main.escrow"))
 
 
@@ -259,26 +252,13 @@ def escrow_withdraw():
     if amount <= 0:
         flash("Please enter a valid amount.", "error")
         return redirect(url_for("main.escrow"))
+    sim = EscrowSimulator()
+    try:
+        sim.withdraw_from_wallet(current_user, amount)
+        flash(f"Successfully withdrew ₹{amount:.2f} from your escrow wallet.", "success")
+    except Exception as e:
+        flash(str(e), "error")
 
-    if amount > current_user.escrow_balance:
-        flash("Insufficient escrow balance.", "error")
-        return redirect(url_for("main.escrow"))
-
-    # In a real application, this would integrate with a payment gateway
-    transaction = EscrowTransaction(
-        user_id=current_user.id,
-        transaction_type="withdrawal",
-        amount=amount,
-        status="completed",
-        notes="Manual withdrawal (simulated)",
-    )
-
-    current_user.escrow_balance -= amount
-
-    db.session.add(transaction)
-    db.session.commit()
-
-    flash(f"Successfully withdrew ₹{amount:.2f} from your escrow wallet.", "success")
     return redirect(url_for("main.escrow"))
 
 
@@ -508,47 +488,23 @@ def manage_escrow(trade_id):
     action = request.json.get("action")
     amount = request.json.get("amount", 0)
 
-    if action == "deposit" and trade.buyer_id == current_user.id:
-        if amount > current_user.escrow_balance:
-            return jsonify({"error": "Insufficient escrow balance"}), 400
+    sim = EscrowSimulator()
+    try:
+        if action == "deposit" and trade.buyer_id == current_user.id:
+            tx = sim.deposit_to_trade(current_user, trade, amount)
+            return jsonify({"success": True, "escrow_amount": trade.escrow_amount})
 
-        current_user.escrow_balance -= amount
-        trade.escrow_amount += amount
+        if action == "release" and trade.seller_id == current_user.id:
+            tx = sim.release_to_seller(current_user, trade)
+            return jsonify({"success": True, "escrow_amount": trade.escrow_amount})
 
-        transaction = EscrowTransaction(
-            user_id=current_user.id,
-            trade_id=trade.id,
-            transaction_type="escrow_hold",
-            amount=amount,
-            notes="Escrow deposit for trade",
-        )
+        if action == "refund" and (trade.seller_id == current_user.id or trade.buyer_id == current_user.id):
+            tx = sim.refund_to_buyer(current_user, trade)
+            return jsonify({"success": True, "escrow_amount": trade.escrow_amount})
 
-        db.session.add(transaction)
-        db.session.commit()
-
-        return jsonify({"success": True, "escrow_amount": trade.escrow_amount})
-
-    elif (
-        action == "release"
-        and trade.seller_id == current_user.id
-        and trade.escrow_amount > 0
-    ):
-        seller = User.query.get(trade.seller_id)
-        seller.escrow_balance += trade.escrow_amount
-
-        transaction = EscrowTransaction(
-            user_id=seller.id,
-            trade_id=trade.id,
-            transaction_type="escrow_release",
-            amount=trade.escrow_amount,
-            notes="Escrow release to seller",
-        )
-
-        db.session.add(transaction)
-        trade.escrow_amount = 0
-        trade.status = "completed"
-        db.session.commit()
-
-        return jsonify({"success": True, "escrow_amount": 0})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception:
+        return jsonify({"error": "Internal error"}), 500
 
     return jsonify({"error": "Invalid action"}), 400
