@@ -2,13 +2,7 @@ from flask import render_template, request, redirect, url_for, session, flash
 from flask_login import login_user, logout_user, login_required, current_user
 from . import auth_bp
 from app.models import db, User
-from app.extensions import login_manager
 from werkzeug.security import generate_password_hash, check_password_hash
-
-
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])

@@ -1,4 +1,9 @@
 // Minimal Phantom (Solana) wallet connect and signature verification flow.
+function getCsrfToken() {
+  const el = document.querySelector('meta[name="csrf-token"]');
+  return el ? el.getAttribute('content') : '';
+}
+
 async function connectPhantom() {
   if (!window.solana || !window.solana.isPhantom) {
     alert('Phantom wallet not found. Please install Phantom or use a Solana wallet.');
@@ -25,7 +30,10 @@ async function connectPhantom() {
 
     const verify = await fetch('/wallet/verify', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCsrfToken()
+      },
       body: JSON.stringify({ public_key: pubB64, signature: sigB64 })
     });
 

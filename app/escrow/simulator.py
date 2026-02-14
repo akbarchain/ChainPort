@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from app.models import EscrowTransaction, Trade, User, db
 
 
@@ -21,7 +21,7 @@ class EscrowSimulator:
             amount=float(amount),
             status="completed",
             notes=notes,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         db.session.add(tx)
         db.session.commit()
@@ -40,7 +40,7 @@ class EscrowSimulator:
             amount=float(amount),
             status="completed",
             notes=notes,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         db.session.add(tx)
         db.session.commit()
@@ -57,6 +57,8 @@ class EscrowSimulator:
             raise ValueError("Insufficient escrow balance")
         if trade.buyer_id != buyer.id:
             raise ValueError("Only buyer can deposit to trade")
+        if trade.total_amount and (trade.escrow_amount or 0) + float(amount) > float(trade.total_amount):
+            raise ValueError("Escrow deposit exceeds trade total")
 
         buyer.escrow_balance -= float(amount)
         trade.escrow_amount = (trade.escrow_amount or 0.0) + float(amount)
@@ -69,7 +71,7 @@ class EscrowSimulator:
             amount=float(amount),
             status="completed",
             notes=f"Escrow deposit for trade #{trade.id}",
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
 
         db.session.add(tx)
@@ -82,10 +84,12 @@ class EscrowSimulator:
         Transfers trade.escrow_amount -> seller.escrow_balance and sets trade.status
         to 'completed'. Returns the created transaction.
         """
+        if actor.id != trade.seller_id:
+            raise ValueError("Only seller can release escrow")
         if trade.escrow_amount <= 0:
             raise ValueError("No escrowed funds to release")
 
-        seller = User.query.get(trade.seller_id)
+        seller = db.session.get(User, trade.seller_id)
         if seller is None:
             raise ValueError("Seller not found")
 
@@ -98,7 +102,7 @@ class EscrowSimulator:
             amount=float(trade.escrow_amount),
             status="completed",
             notes=f"Escrow released for trade #{trade.id}",
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
 
         trade.escrow_amount = 0
@@ -110,10 +114,12 @@ class EscrowSimulator:
 
     def refund_to_buyer(self, actor: User, trade: Trade):
         """Refund escrowed funds back to the buyer. Sets trade.status to 'cancelled'."""
+        if actor.id not in (trade.buyer_id, trade.seller_id):
+            raise ValueError("Only buyer or seller can refund escrow")
         if trade.escrow_amount <= 0:
             raise ValueError("No escrowed funds to refund")
 
-        buyer = User.query.get(trade.buyer_id)
+        buyer = db.session.get(User, trade.buyer_id)
         if buyer is None:
             raise ValueError("Buyer not found")
 
@@ -126,7 +132,7 @@ class EscrowSimulator:
             amount=float(trade.escrow_amount),
             status="completed",
             notes=f"Escrow refunded for trade #{trade.id}",
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
 
         trade.escrow_amount = 0

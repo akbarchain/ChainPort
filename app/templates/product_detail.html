@@ -39,7 +39,7 @@
         <section class="product-details">
             <div class="product-info">
                 <div class="price-section">
-                    <h3>₹{{ "%.2f"|format(product.price_per_unit) }} per {{ product.unit }}</h3>
+                    <h3>&#8377;{{ "%.2f"|format(product.price_per_unit) }} per {{ product.unit }}</h3>
                     {% if product.min_order_quantity %}
                     <p class="min-order">Minimum Order: {{ product.min_order_quantity }} {{ product.unit }}</p>
                     {% endif %}

@@ -49,8 +49,8 @@
                     <p><strong>Product:</strong> {{ trade.product.title }}</p>
                     {% endif %}
                     <p><strong>Quantity:</strong> {{ trade.quantity }} {{ trade.unit or 'units' }}</p>
-                    <p><strong>Unit Price:</strong> ₹{{ "%.2f"|format(trade.price_per_unit) }}</p>
-                    <p><strong>Total Amount:</strong> ₹{{ "%.2f"|format(trade.total_amount) }}</p>
+                    <p><strong>Unit Price:</strong> &#8377;{{ "%.2f"|format(trade.price_per_unit) }}</p>
+                    <p><strong>Total Amount:</strong> &#8377;{{ "%.2f"|format(trade.total_amount) }}</p>
                     <p><strong>Currency:</strong> {{ trade.currency or 'INR' }}</p>
                     {% if trade.payment_terms %}
                     <p><strong>Payment Terms:</strong> {{ trade.payment_terms }}</p>
@@ -67,7 +67,7 @@
                 {% if trade.escrow_amount > 0 %}
                 <div class="escrow-info">
                     <h4>Escrow Information</h4>
-                    <p><strong>Escrow Amount:</strong> ₹{{ "%.2f"|format(trade.escrow_amount) }}</p>
+                    <p><strong>Escrow Amount:</strong> &#8377;{{ "%.2f"|format(trade.escrow_amount) }}</p>
                 </div>
                 {% endif %}
 
@@ -131,14 +131,20 @@
 </div>
 
 <script>
+function getCsrfToken() {
+    const el = document.querySelector('meta[name="csrf-token"]');
+    return el ? el.getAttribute('content') : '';
+}
+
 function depositEscrow(button) {
     const tradeId = button.dataset.tradeId;
     const amount = parseFloat(button.dataset.amount);
-    if (confirm(`Deposit $?{amount.toFixed(2)} to escrow for this trade?`)) {
-        fetch(`/api/trade/?{tradeId}/escrow`, {
+    if (confirm(`Deposit INR ${amount.toFixed(2)} to escrow for this trade?`)) {
+        fetch(`/api/trade/${tradeId}/escrow`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken(),
             },
             body: JSON.stringify({ action: 'deposit', amount: amount })
         })
@@ -159,10 +165,11 @@ function depositEscrow(button) {
 function releaseEscrow(button) {
     const tradeId = button.dataset.tradeId;
     if (confirm('Release escrow funds to the seller? This action cannot be undone.')) {
-        fetch(`/api/trade/?{tradeId}/escrow`, {
+        fetch(`/api/trade/${tradeId}/escrow`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken(),
             },
             body: JSON.stringify({ action: 'release' })
         })
@@ -182,12 +189,13 @@ function releaseEscrow(button) {
 
 function updateStatus(button, status) {
     const tradeId = button.dataset.tradeId;
-    const confirmMsg = status === 'cancelled' ? 'Cancel this trade?' : `Change status to ?{status}?`;
+    const confirmMsg = status === 'cancelled' ? 'Cancel this trade?' : `Change status to ${status}?`;
     if (confirm(confirmMsg)) {
-        fetch(`/api/trade/?{tradeId}/status`, {
+        fetch(`/api/trade/${tradeId}/status`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken(),
             },
             body: JSON.stringify({ status: status })
         })

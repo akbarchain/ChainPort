@@ -51,7 +51,7 @@
                         <td>{% if trade.buyer_id == current_user.id %}{{ trade.seller.company_name or trade.seller.full_name }}{% else %}{{ trade.buyer.company_name or trade.buyer.full_name }}{% endif %}</td>
                         <td>{% if trade.buyer_id == current_user.id %}Buyer{% else %}Seller{% endif %}</td>
                         <td class="status {{ trade.status }}">{{ trade.status.replace('_', ' ').title() }}</td>
-                        <td>₹{{ "%.2f"|format(trade.total_amount) }}</td>
+                        <td>&#8377;{{ "%.2f"|format(trade.total_amount) }}</td>
                         <td>{{ trade.created_at.strftime('%Y-%m-%d') }}</td>
                         <td><a href="{{ url_for('main.trade_detail', trade_id=trade.id) }}" class="action-link">View Details</a></td>
                     </tr>

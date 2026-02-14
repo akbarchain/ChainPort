@@ -30,43 +30,71 @@
             <h3>Settings</h3>
         </header>
 
-        <section class="settings-section">
+        <section class="profile-section settings-section">
             <h4>Account Settings</h4>
-            <form class="settings-form" method="POST" action="{{ url_for('main.settings') }}">
+            <form class="settings-form message-form" method="POST" action="{{ url_for('main.settings') }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <input type="hidden" name="action" value="update_profile">
-                <label>Company Name</label>
-                <input type="text" value="{{ user.company_name or '' }}">
 
-                <label>Email</label>
-                <input type="email" value="{{ user.email }}">
+                <div class="form-group">
+                    <label>First Name</label>
+                    <input type="text" name="first_name" value="{{ user.first_name or '' }}">
+                </div>
 
-                <label>Phone</label>
-                <input type="tel" value="{{ user.phone or '' }}">
+                <div class="form-group">
+                    <label>Last Name</label>
+                    <input type="text" name="last_name" value="{{ user.last_name or '' }}">
+                </div>
 
-                <button type="submit">Update Profile</button>
+                <div class="form-group">
+                    <label>Company Name</label>
+                    <input type="text" name="company_name" value="{{ user.company_name or '' }}">
+                </div>
+
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" value="{{ user.email }}" disabled>
+                </div>
+
+                <div class="form-group">
+                    <label>Phone</label>
+                    <input type="tel" name="phone" value="{{ user.phone or '' }}">
+                </div>
+
+                <button type="submit" class="btn-primary">Update Profile</button>
             </form>
 
             <h4>Security</h4>
-            <form class="settings-form" method="POST" action="{{ url_for('main.settings') }}">
+            <form class="settings-form message-form" method="POST" action="{{ url_for('main.settings') }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <input type="hidden" name="action" value="change_password">
-                <label>Current Password</label>
-                <input type="password" name="current_password" required>
 
-                <label>New Password</label>
-                <input type="password" name="new_password" required>
+                <div class="form-group">
+                    <label>Current Password</label>
+                    <input type="password" name="current_password" required>
+                </div>
 
-                <label>Confirm New Password</label>
-                <input type="password" name="confirm_password" required>
+                <div class="form-group">
+                    <label>New Password</label>
+                    <input type="password" name="new_password" required>
+                </div>
 
-                <button type="submit">Change Password</button>
+                <div class="form-group">
+                    <label>Confirm New Password</label>
+                    <input type="password" name="confirm_password" required>
+                </div>
+
+                <button type="submit" class="btn-primary">Change Password</button>
             </form>
 
             <h4>Notifications</h4>
             <div class="notification-settings">
-                <label><input type="checkbox" checked> Email notifications for new trades</label>
-                <label><input type="checkbox" checked> Email notifications for messages</label>
+                <div class="form-group">
+                    <label><input type="checkbox" checked> Email notifications for new trades</label>
+                </div>
+                <div class="form-group">
+                    <label><input type="checkbox" checked> Email notifications for messages</label>
+                </div>
             </div>
         </section>
 

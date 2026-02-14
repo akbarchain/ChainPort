@@ -131,7 +131,7 @@ with app.app_context():
         {
             "seller_email": "rajesh.adhesives@chemical.com",
             "title": "Industrial Grade Adhesives - Multi Purpose",
-            "description": "High-strength industrial adhesives suitable for wood, metal, and plastic bonding. Temperature resistant up to 120°C.",
+            "description": "High-strength industrial adhesives suitable for wood, metal, and plastic bonding. Temperature resistant up to 120C.",
             "category": "Chemical Products",
             "hs_code": "350910",
             "quantity": 10000.0,
@@ -338,15 +338,15 @@ with app.app_context():
 
     db.session.commit()
 
-    print("✅ Database seeding completed successfully!")
-    print("\n📊 Created Users:")
+    print("OK Database seeding completed successfully!")
+    print("\n Created Users:")
     for user in User.query.all():
         print(f"  - {user.email} ({user.company_name})")
     
-    print("\n📦 Created Products:")
+    print("\n Created Products:")
     for product in Product.query.all():
-        print(f"  - {product.title} (₹{product.price_per_unit}/unit) by {product.seller.company_name}")
+        print(f"  - {product.title} (INR {product.price_per_unit}/unit) by {product.seller.company_name}")
     
-    print("\n💼 Created Trades:")
+    print("\n Created Trades:")
     for trade in Trade.query.all():
-        print(f"  - {trade.buyer.company_name} → {trade.seller.company_name}: ₹{trade.total_amount}")
+        print(f"  - {trade.buyer.company_name} -> {trade.seller.company_name}: INR {trade.total_amount}")

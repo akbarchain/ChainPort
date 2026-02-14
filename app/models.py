@@ -1,12 +1,12 @@
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from datetime import datetime, timezone
 from app.extensions import db
 from flask_login import UserMixin
 
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(120), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(128), nullable=False)
     first_name = db.Column(db.String(50))
     last_name = db.Column(db.String(50))
@@ -18,9 +18,11 @@ class User(UserMixin, db.Model):
         db.String(20), default="pending"
     )  # pending, submitted, verified, rejected
     escrow_balance = db.Column(db.Float, default=0.0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(
-        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
     # Relationships
@@ -58,47 +60,51 @@ class User(UserMixin, db.Model):
 
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    seller_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    seller_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text)
-    category = db.Column(db.String(50))
+    category = db.Column(db.String(50), index=True)
     hs_code = db.Column(db.String(20))  # Harmonized System code
     quantity = db.Column(db.Float)
     unit = db.Column(db.String(20))  # kg, tons, pieces, etc.
     price_per_unit = db.Column(db.Float, nullable=False)
     currency = db.Column(db.String(10), default="INR")
-    country_of_origin = db.Column(db.String(50))
+    country_of_origin = db.Column(db.String(50), index=True)
     min_order_quantity = db.Column(db.Float)
     payment_terms = db.Column(db.String(100))
     delivery_terms = db.Column(db.String(100))  # FOB, CIF, etc.
     is_active = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(
-        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
 
 class Trade(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    buyer_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    seller_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    product_id = db.Column(db.Integer, db.ForeignKey("product.id"), nullable=True)
+    buyer_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    seller_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    product_id = db.Column(db.Integer, db.ForeignKey("product.id"), nullable=True, index=True)
     quantity = db.Column(db.Float, nullable=False)
     unit = db.Column(db.String(20))
     price_per_unit = db.Column(db.Float, nullable=False)
     total_amount = db.Column(db.Float, nullable=False)
     currency = db.Column(db.String(10), default="INR")
     status = db.Column(
-        db.String(20), default="pending"
+        db.String(20), default="pending", index=True
     )  # pending, escrow_deposited, in_progress, completed, cancelled, disputed
     escrow_amount = db.Column(db.Float, default=0.0)
     payment_terms = db.Column(db.String(100))
     delivery_terms = db.Column(db.String(100))
     delivery_date = db.Column(db.DateTime)
     notes = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(
-        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
     # Relationships
@@ -117,13 +123,13 @@ class Trade(db.Model):
 
 class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    sender_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    receiver_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    trade_id = db.Column(db.Integer, db.ForeignKey("trade.id"), nullable=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    receiver_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    trade_id = db.Column(db.Integer, db.ForeignKey("trade.id"), nullable=True, index=True)
     subject = db.Column(db.String(200))
     content = db.Column(db.Text, nullable=False)
     is_read = db.Column(db.Boolean, default=False)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
     # Relationships
     sender = db.relationship(
@@ -133,12 +139,24 @@ class Message(db.Model):
         "User", foreign_keys=[receiver_id], overlaps="receiver_user,received_messages"
     )
     trade = db.relationship("Trade", back_populates="messages")
+    attachments = db.relationship("MessageAttachment", backref="message", lazy=True)
+
+
+class MessageAttachment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    message_id = db.Column(db.Integer, db.ForeignKey("message.id"), nullable=False, index=True)
+    filename = db.Column(db.String(255), nullable=False)
+    original_filename = db.Column(db.String(255), nullable=False)
+    file_path = db.Column(db.String(500), nullable=False)
+    content_type = db.Column(db.String(100))
+    file_size = db.Column(db.Integer)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class EscrowTransaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    trade_id = db.Column(db.Integer, db.ForeignKey("trade.id"), nullable=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    trade_id = db.Column(db.Integer, db.ForeignKey("trade.id"), nullable=True, index=True)
     transaction_type = db.Column(
         db.String(20), nullable=False
     )  # deposit, withdrawal, escrow_hold, escrow_release, escrow_refund
@@ -147,7 +165,7 @@ class EscrowTransaction(db.Model):
     status = db.Column(db.String(20), default="completed")  # pending, completed, failed
     reference_id = db.Column(db.String(100))  # external payment reference
     notes = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class KYCDocument(db.Model):
@@ -160,6 +178,6 @@ class KYCDocument(db.Model):
     original_filename = db.Column(db.String(255), nullable=False)
     file_path = db.Column(db.String(500), nullable=False)
     status = db.Column(db.String(20), default="pending")  # pending, approved, rejected
-    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    uploaded_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     reviewed_at = db.Column(db.DateTime)
     reviewer_notes = db.Column(db.Text)

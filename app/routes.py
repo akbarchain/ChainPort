@@ -1,5 +1,9 @@
 from datetime import datetime
+import time
 import os
+import base64
+import uuid
+import io
 
 from flask import (
     Blueprint,
@@ -11,17 +15,26 @@ from flask import (
     jsonify,
     session,
     current_app,
+    abort,
+    send_file,
 )
 
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
-from app.models import User, Trade, Product, Message, EscrowTransaction, KYCDocument, db
+from app.models import (
+    User,
+    Trade,
+    Product,
+    Message,
+    MessageAttachment,
+    EscrowTransaction,
+    KYCDocument,
+    db,
+)
 from app.extensions import csrf
 from app.escrow.simulator import EscrowSimulator
-import os
-import base64
-from flask import session
+from app.utils.pdf_report import create_trade_pdf
 
 # Optional PyNaCl import for ed25519 verification; wallet endpoints degrade if unavailable
 try:
@@ -33,18 +46,94 @@ except Exception:
 
 main_bp = Blueprint("main", __name__)
 
+_MESSAGE_RATE_LIMIT = {}
+_MESSAGE_RATE_WINDOW = 60
+_MESSAGE_RATE_MAX = 12
+
+
+def get_or_404(model, obj_id):
+    obj = db.session.get(model, obj_id)
+    if obj is None:
+        abort(404)
+    return obj
+
+
+def build_conversations(user_id):
+    messages = (
+        Message.query.filter(
+            (Message.sender_id == user_id) | (Message.receiver_id == user_id)
+        )
+        .order_by(Message.timestamp.desc())
+        .all()
+    )
+
+    latest_by_user = {}
+    for msg in messages:
+        other_id = msg.receiver_id if msg.sender_id == user_id else msg.sender_id
+        if other_id not in latest_by_user:
+            latest_by_user[other_id] = msg
+
+    conversations = []
+    for other_id, last_message in latest_by_user.items():
+        other_user = db.session.get(User, other_id)
+        if other_user:
+            conversations.append({"user": other_user, "last_message": last_message})
+
+    return conversations
+
+
+def get_preferred_chat_user_id(user_id):
+    last_tx = (
+        EscrowTransaction.query.filter(
+            EscrowTransaction.user_id == user_id,
+            EscrowTransaction.trade_id.isnot(None),
+        )
+        .order_by(EscrowTransaction.created_at.desc())
+        .first()
+    )
+    if not last_tx:
+        return None
+    trade = db.session.get(Trade, last_tx.trade_id)
+    if not trade:
+        return None
+    if trade.buyer_id == user_id:
+        return trade.seller_id
+    if trade.seller_id == user_id:
+        return trade.buyer_id
+    return None
+
 
 def allowed_file(filename, allowed_extensions):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in allowed_extensions
 
 
-# 👉 Landing Page
+def _serialize_message(msg):
+    return {
+        "id": msg.id,
+        "sender_id": msg.sender_id,
+        "receiver_id": msg.receiver_id,
+        "subject": msg.subject,
+        "content": msg.content,
+        "timestamp": msg.timestamp.isoformat() if msg.timestamp else None,
+        "is_read": msg.is_read,
+        "attachments": [
+            {
+                "id": att.id,
+                "name": att.original_filename,
+                "url": url_for("main.message_attachment", attachment_id=att.id),
+            }
+            for att in (msg.attachments or [])
+        ],
+    }
+
+
+# Landing Page
 @main_bp.route("/")
 def index():
     return render_template("index.html")
 
 
-# 👉 Dashboard (protected)
+# Dashboard (protected)
 @main_bp.route("/dashboard")
 @login_required
 def dashboard():
@@ -143,14 +232,14 @@ def marketplace():
 @main_bp.route("/product/<int:product_id>")
 @login_required
 def product_detail(product_id):
-    product = Product.query.get_or_404(product_id)
+    product = get_or_404(Product, product_id)
     return render_template("product_detail.html", product=product)
 
 
 @main_bp.route("/create-trade/<int:product_id>", methods=["GET", "POST"])
 @login_required
 def create_trade(product_id):
-    product = Product.query.get_or_404(product_id)
+    product = get_or_404(Product, product_id)
 
     if product.seller_id == current_user.id:
         flash("You cannot trade with yourself.", "error")
@@ -199,7 +288,7 @@ def create_trade(product_id):
 @main_bp.route("/trade/<int:trade_id>")
 @login_required
 def trade_detail(trade_id):
-    trade = Trade.query.get_or_404(trade_id)
+    trade = get_or_404(Trade, trade_id)
 
     if trade.buyer_id != current_user.id and trade.seller_id != current_user.id:
         flash("You don't have permission to view this trade.", "error")
@@ -248,7 +337,7 @@ def escrow_deposit():
     sim = EscrowSimulator()
     try:
         sim.deposit_to_wallet(current_user, amount)
-        flash(f"Successfully deposited ₹{amount:.2f} to your escrow wallet.", "success")
+        flash(f"Successfully deposited INR {amount:.2f} to your escrow wallet.", "success")
     except Exception as e:
         flash(str(e), "error")
 
@@ -266,7 +355,7 @@ def escrow_withdraw():
     sim = EscrowSimulator()
     try:
         sim.withdraw_from_wallet(current_user, amount)
-        flash(f"Successfully withdrew ₹{amount:.2f} from your escrow wallet.", "success")
+        flash(f"Successfully withdrew INR {amount:.2f} from your escrow wallet.", "success")
     except Exception as e:
         flash(str(e), "error")
 
@@ -276,92 +365,103 @@ def escrow_withdraw():
 @main_bp.route("/messages")
 @login_required
 def messages():
-    # Get conversations (unique users with message history)
-    sent_messages = (
-        db.session.query(Message.receiver_id)
-        .filter_by(sender_id=current_user.id)
-        .distinct()
-    )
-    received_messages = (
-        db.session.query(Message.sender_id)
-        .filter_by(receiver_id=current_user.id)
-        .distinct()
-    )
+    conversations = build_conversations(current_user.id)
+    preferred_user_id = get_preferred_chat_user_id(current_user.id)
+    selected_user_id = request.args.get("user_id", type=int)
+    selected_user = None
+    thread_messages = []
 
-    user_ids = set()
-    for msg in sent_messages:
-        user_ids.add(msg[0])
-    for msg in received_messages:
-        user_ids.add(msg[0])
+    if selected_user_id:
+        selected_user = db.session.get(User, selected_user_id)
+        if selected_user:
+            Message.query.filter_by(
+                sender_id=selected_user.id,
+                receiver_id=current_user.id,
+                is_read=False,
+            ).update({"is_read": True})
+            db.session.commit()
 
-    conversations = []
-    for user_id in user_ids:
-        other_user = User.query.get(user_id)
-        if other_user:
-            last_message = (
+            thread_messages = (
                 Message.query.filter(
-                    (
-                        (Message.sender_id == current_user.id)
-                        & (Message.receiver_id == user_id)
-                    )
-                    | (
-                        (Message.sender_id == user_id)
-                        & (Message.receiver_id == current_user.id)
-                    )
+                    ((Message.sender_id == current_user.id) & (Message.receiver_id == selected_user.id))
+                    | ((Message.sender_id == selected_user.id) & (Message.receiver_id == current_user.id))
                 )
                 .order_by(Message.timestamp.desc())
-                .first()
+                .limit(200)
+                .all()
             )
+            thread_messages = list(reversed(thread_messages))
 
-            conversations.append({"user": other_user, "last_message": last_message})
-
-    conversations.sort(
-        key=lambda x: (
-            x["last_message"].timestamp if x["last_message"] else datetime.min
-        ),
-        reverse=True,
+    return render_template(
+        "messages.html",
+        conversations=conversations,
+        preferred_user_id=preferred_user_id,
+        selected_user=selected_user,
+        messages=thread_messages,
     )
 
-    return render_template("messages.html", conversations=conversations)
+
+@main_bp.route("/messages/start", methods=["POST"])
+@login_required
+def start_message():
+    email = request.form.get("email", "").strip().lower()
+    if not email:
+        flash("Enter a valid email to start a chat.", "error")
+        return redirect(url_for("main.messages"))
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        flash("No user found with that email.", "error")
+        return redirect(url_for("main.messages"))
+
+    if user.id == current_user.id:
+        flash("You cannot start a chat with yourself.", "error")
+        return redirect(url_for("main.messages"))
+
+    return redirect(url_for("main.messages", user_id=user.id))
 
 
 @main_bp.route("/messages/<int:user_id>")
 @login_required
 def conversation(user_id):
-    other_user = User.query.get_or_404(user_id)
-
-    # Mark messages as read
-    Message.query.filter_by(
-        sender_id=user_id, receiver_id=current_user.id, is_read=False
-    ).update({"is_read": True})
-    db.session.commit()
-
-    messages = (
-        Message.query.filter(
-            ((Message.sender_id == current_user.id) & (Message.receiver_id == user_id))
-            | (
-                (Message.sender_id == user_id)
-                & (Message.receiver_id == current_user.id)
-            )
-        )
-        .order_by(Message.timestamp)
-        .all()
-    )
-
-    return render_template(
-        "conversation.html", other_user=other_user, messages=messages
-    )
+    return redirect(url_for("main.messages", user_id=user_id))
 
 
 @main_bp.route("/send-message", methods=["POST"])
 @login_required
 def send_message():
+    now = time.time()
+    key = f"user:{current_user.id}"
+    timestamps = _MESSAGE_RATE_LIMIT.get(key, [])
+    timestamps = [ts for ts in timestamps if now - ts < _MESSAGE_RATE_WINDOW]
+    if len(timestamps) >= _MESSAGE_RATE_MAX:
+        flash("You are sending messages too quickly. Please wait and try again.", "error")
+        return redirect(request.referrer or url_for("main.messages"))
+    timestamps.append(now)
+    _MESSAGE_RATE_LIMIT[key] = timestamps
+
     receiver_id = int(request.form.get("receiver_id"))
     trade_id = request.form.get("trade_id")
     subject = request.form.get("subject", "")
     content = request.form.get("content", "").strip()
+    uploaded_files = request.files.getlist("attachments")
 
-    if not content:
+    files = [f for f in uploaded_files if f and f.filename]
+    if len(files) > current_app.config["MESSAGE_ATTACHMENT_LIMIT"]:
+        flash("Too many attachments. Please limit your upload.", "error")
+        return redirect(request.referrer or url_for("main.messages"))
+
+    valid_files = [
+        f
+        for f in files
+        if allowed_file(f.filename, current_app.config["ALLOWED_EXTENSIONS"])
+    ]
+
+    if files and not valid_files:
+        flash("All selected attachments are invalid file types.", "error")
+        return redirect(request.referrer or url_for("main.messages"))
+
+    if not content and not valid_files:
         flash("Message cannot be empty.", "error")
         return redirect(request.referrer or url_for("main.messages"))
 
@@ -376,8 +476,120 @@ def send_message():
     db.session.add(message)
     db.session.commit()
 
+    if valid_files:
+        for file in valid_files:
+            original_filename = file.filename
+            safe_name = secure_filename(original_filename)
+            base_name, ext = os.path.splitext(safe_name)
+            if not base_name:
+                base_name = "attachment"
+            unique_name = f"{base_name}-{uuid.uuid4().hex}{ext.lower()}"
+            file_path = os.path.join(current_app.config["MESSAGE_UPLOAD_FOLDER"], unique_name)
+            file.save(file_path)
+            attachment = MessageAttachment(
+                message_id=message.id,
+                filename=unique_name,
+                original_filename=original_filename,
+                file_path=file_path,
+                content_type=file.mimetype,
+                file_size=os.path.getsize(file_path),
+            )
+            db.session.add(attachment)
+        db.session.commit()
+
     flash("Message sent successfully!", "success")
     return redirect(request.referrer or url_for("main.messages"))
+
+
+@main_bp.route("/messages/attachment/<int:attachment_id>")
+@login_required
+def message_attachment(attachment_id):
+    attachment = db.session.get(MessageAttachment, attachment_id)
+    if not attachment:
+        abort(404)
+    if (
+        attachment.message.sender_id != current_user.id
+        and attachment.message.receiver_id != current_user.id
+    ):
+        abort(403)
+    if not os.path.exists(attachment.file_path):
+        abort(404)
+    return send_file(
+        attachment.file_path,
+        as_attachment=True,
+        download_name=attachment.original_filename,
+    )
+
+
+@main_bp.route("/api/messages/thread/<int:user_id>")
+@login_required
+def api_thread(user_id):
+    other_user = db.session.get(User, user_id)
+    if not other_user:
+        return jsonify({"error": "User not found"}), 404
+
+    since_id = request.args.get("since_id", type=int)
+    query = Message.query.filter(
+        ((Message.sender_id == current_user.id) & (Message.receiver_id == user_id))
+        | ((Message.sender_id == user_id) & (Message.receiver_id == current_user.id))
+    ).order_by(Message.timestamp)
+
+    limit = request.args.get("limit", type=int) or 200
+    limit = max(1, min(limit, 500))
+
+    if since_id:
+        query = query.filter(Message.id > since_id)
+
+    messages = query.limit(limit).all()
+    return jsonify({"messages": [_serialize_message(m) for m in messages]})
+
+
+@main_bp.route("/api/messages/escrow-suggestions")
+@login_required
+def api_escrow_suggestions():
+    trade_ids = set(
+        row[0]
+        for row in db.session.query(EscrowTransaction.trade_id)
+        .filter(EscrowTransaction.user_id == current_user.id)
+        .filter(EscrowTransaction.trade_id.isnot(None))
+        .distinct()
+        .all()
+        if row[0] is not None
+    )
+
+    # Also include all trades where the user is buyer or seller.
+    trade_ids.update(
+        row[0]
+        for row in db.session.query(Trade.id)
+        .filter((Trade.buyer_id == current_user.id) | (Trade.seller_id == current_user.id))
+        .all()
+    )
+
+    if not trade_ids:
+        return jsonify({"users": []})
+
+    trades = Trade.query.filter(Trade.id.in_(list(trade_ids))).all()
+    user_ids = set()
+    for trade in trades:
+        if trade.buyer_id == current_user.id and trade.seller_id:
+            user_ids.add(trade.seller_id)
+        elif trade.seller_id == current_user.id and trade.buyer_id:
+            user_ids.add(trade.buyer_id)
+
+    users = []
+    for uid in user_ids:
+        u = db.session.get(User, uid)
+        if u:
+            users.append(
+                {
+                    "id": u.id,
+                    "name": u.company_name or u.full_name or u.email,
+                    "email": u.email,
+                }
+            )
+
+    users.sort(key=lambda x: x["name"].lower())
+    return jsonify({"users": users})
 
 
 @main_bp.route("/profile")
@@ -393,25 +605,44 @@ def kyc():
     if request.method == "POST":
         # Handle file uploads
         uploaded_files = request.files.getlist("documents")
+        business_registration = request.form.get("business_registration", "").strip()
+        tax_id = request.form.get("tax_id", "").strip()
 
+        if business_registration and len(business_registration) < 3:
+            flash("Business registration number is too short.", "error")
+            return redirect(url_for("main.kyc"))
+        if tax_id and len(tax_id) < 3:
+            flash("Tax ID is too short.", "error")
+            return redirect(url_for("main.kyc"))
+
+        has_valid_doc = False
         for file in uploaded_files:
             if file and allowed_file(
                 file.filename, current_app.config["ALLOWED_EXTENSIONS"]
             ):
-                filename = secure_filename(file.filename)
-                # In a real app, you'd want to generate unique filenames
-                file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
+                has_valid_doc = True
+                original_filename = file.filename
+                safe_name = secure_filename(original_filename)
+                base_name, ext = os.path.splitext(safe_name)
+                if not base_name:
+                    base_name = "document"
+                unique_name = f"{base_name}-{uuid.uuid4().hex}{ext.lower()}"
+                file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], unique_name)
                 file.save(file_path)
 
                 kyc_doc = KYCDocument(
                     user_id=current_user.id,
                     document_type=request.form.get("document_type", "general"),
-                    filename=filename,
-                    original_filename=file.filename,
+                    filename=unique_name,
+                    original_filename=original_filename,
                     file_path=file_path,
                 )
 
                 db.session.add(kyc_doc)
+
+        if not has_valid_doc:
+            flash("Please upload at least one valid document.", "error")
+            return redirect(url_for("main.kyc"))
 
         current_user.kyc_status = "submitted"
         db.session.commit()
@@ -462,14 +693,14 @@ def settings():
 # API endpoints for AJAX requests
 @main_bp.route("/api/trade/<int:trade_id>/status", methods=["POST"])
 @login_required
-@csrf.exempt
 def update_trade_status(trade_id):
-    trade = Trade.query.get_or_404(trade_id)
+    trade = get_or_404(Trade, trade_id)
 
     if trade.buyer_id != current_user.id and trade.seller_id != current_user.id:
         return jsonify({"error": "Permission denied"}), 403
 
-    new_status = request.json.get("status")
+    data = request.get_json(silent=True) or {}
+    new_status = data.get("status")
 
     if new_status not in [
         "pending",
@@ -489,29 +720,54 @@ def update_trade_status(trade_id):
 
 @main_bp.route("/api/trade/<int:trade_id>/escrow", methods=["POST"])
 @login_required
-@csrf.exempt
 def manage_escrow(trade_id):
-    trade = Trade.query.get_or_404(trade_id)
+    trade = get_or_404(Trade, trade_id)
 
     if trade.buyer_id != current_user.id and trade.seller_id != current_user.id:
         return jsonify({"error": "Permission denied"}), 403
 
-    action = request.json.get("action")
-    amount = request.json.get("amount", 0)
+    data = request.get_json(silent=True) or {}
+    action = data.get("action")
+    amount = data.get("amount", 0)
+    try:
+        amount = float(amount)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid amount"}), 400
 
     sim = EscrowSimulator()
     try:
-        if action == "deposit" and trade.buyer_id == current_user.id:
+        if action == "deposit":
+            if trade.buyer_id != current_user.id:
+                return jsonify({"error": "Only buyer can deposit to escrow"}), 403
             tx = sim.deposit_to_trade(current_user, trade, amount)
-            return jsonify({"success": True, "escrow_amount": trade.escrow_amount})
+            report_url = None
+            try:
+                report_url = url_for('main.trade_report', trade_id=trade.id, tx_id=tx.id)
+            except Exception:
+                report_url = None
+            return jsonify({"success": True, "escrow_amount": trade.escrow_amount, "report_url": report_url})
 
-        if action == "release" and trade.seller_id == current_user.id:
+        if action == "release":
+            if trade.seller_id != current_user.id:
+                return jsonify({"error": "Only seller can release escrow"}), 403
             tx = sim.release_to_seller(current_user, trade)
-            return jsonify({"success": True, "escrow_amount": trade.escrow_amount})
+            report_url = None
+            try:
+                report_url = url_for('main.trade_report', trade_id=trade.id, tx_id=tx.id)
+            except Exception:
+                report_url = None
+            return jsonify({"success": True, "escrow_amount": trade.escrow_amount, "report_url": report_url})
 
-        if action == "refund" and (trade.seller_id == current_user.id or trade.buyer_id == current_user.id):
+        if action == "refund":
+            if trade.seller_id != current_user.id and trade.buyer_id != current_user.id:
+                return jsonify({"error": "Only buyer or seller can refund escrow"}), 403
             tx = sim.refund_to_buyer(current_user, trade)
-            return jsonify({"success": True, "escrow_amount": trade.escrow_amount})
+            report_url = None
+            try:
+                report_url = url_for('main.trade_report', trade_id=trade.id, tx_id=tx.id)
+            except Exception:
+                report_url = None
+            return jsonify({"success": True, "escrow_amount": trade.escrow_amount, "report_url": report_url})
 
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
@@ -519,6 +775,29 @@ def manage_escrow(trade_id):
         return jsonify({"error": "Internal error"}), 500
 
     return jsonify({"error": "Invalid action"}), 400
+
+
+@main_bp.route('/trade/<int:trade_id>/report/<int:tx_id>')
+@login_required
+def trade_report(trade_id, tx_id):
+    trade = get_or_404(Trade, trade_id)
+
+    # Only participants may download the report
+    if trade.buyer_id != current_user.id and trade.seller_id != current_user.id:
+        flash("You don't have permission to view this report.", "error")
+        return redirect(url_for('main.trade_detail', trade_id=trade.id))
+
+    tx = None
+    if tx_id:
+        tx = db.session.get(EscrowTransaction, tx_id)
+
+    try:
+        buf = create_trade_pdf(trade, tx)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    buf.seek(0)
+    return send_file(buf, mimetype='application/pdf', as_attachment=True, download_name=f'trade_{trade.id}_report.pdf')
 
 
 @main_bp.route('/wallet/challenge')
@@ -555,4 +834,5 @@ def wallet_verify():
 
     # mark wallet as connected in session
     session['wallet_address'] = base64.b64encode(pub_bytes).decode('ascii')
+    session.pop('wallet_challenge', None)
     return jsonify({'success': True})

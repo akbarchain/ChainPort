@@ -30,43 +30,294 @@
             <h3>Messages</h3>
         </header>
 
-        <section class="messages-section">
-            <div class="messages-list">
-                <h4>Conversations</h4>
+        <section class="chat-shell">
+            <div class="chat-list">
+                <div class="chat-list-header">
+                    <div>
+                        <h4>Chats</h4>
+                        <span class="chat-count">{{ conversations|length }}</span>
+                    </div>
+                    <button class="chat-new" id="chat-new" type="button"
+                            data-preferred-user-id="{% if preferred_user_id %}{{ preferred_user_id }}{% endif %}">New</button>
+                </div>
+                <div class="chat-search-wrap">
+                    <input class="chat-search" id="chat-search" type="text" placeholder="Search conversations">
+                    <div class="chat-suggestions" id="chat-suggestions"></div>
+                </div>
+                <div class="chat-new-panel" id="chat-new-panel">
+                    <form method="POST" action="{{ url_for('main.start_message') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <label for="new-chat-email">Start new chat</label>
+                        <input id="new-chat-email" type="email" name="email" placeholder="user@company.com" required>
+                        <button type="submit" class="btn-primary">Start</button>
+                    </form>
+                </div>
                 {% if conversations %}
-                <div class="conversations">
+                <div class="chat-items">
                     {% for conv in conversations %}
-                    <div class="conversation-item">
-                        <a href="{{ url_for('main.conversation', user_id=conv.user.id) }}">
-                            <div class="conversation-info">
-                                <h5>{{ conv.user.company_name or conv.user.full_name }}</h5>
-                                <p>{{ conv.user.email }}</p>
+                    <a class="chat-item {{ 'active' if selected_user and conv.user.id == selected_user.id else '' }}"
+                       href="{{ url_for('main.messages', user_id=conv.user.id) }}"
+                       data-name="{{ (conv.user.company_name or conv.user.full_name or conv.user.email)|lower }}"
+                       data-email="{{ conv.user.email|lower }}">
+                        <div class="chat-avatar">{{ (conv.user.company_name or conv.user.full_name or conv.user.email)[0]|upper }}</div>
+                        <div class="chat-meta">
+                            <div class="chat-title">
+                                <span class="chat-name">{{ conv.user.company_name or conv.user.full_name or conv.user.email }}</span>
                                 {% if conv.last_message %}
-                                <small>Last message: {{ conv.last_message.timestamp.strftime('%Y-%m-%d %H:%M') }}</small>
+                                <span class="chat-time">{{ conv.last_message.timestamp.strftime('%b %d, %H:%M') }}</span>
                                 {% endif %}
                             </div>
-                            {% if conv.last_message and not conv.last_message.is_read and conv.last_message.receiver_id == current_user.id %}
-                            <span class="unread-indicator"></span>
-                            {% endif %}
-                        </a>
-                    </div>
+                            <div class="chat-preview">
+                                {% if conv.last_message %}
+                                {% if conv.last_message.trade_id %}
+                                Trade #CP{{ conv.last_message.trade_id }} -
+                                {% endif %}
+                                {{ (conv.last_message.subject or conv.last_message.content or 'No message')|truncate(60, True, '...') }}
+                                {% else %}
+                                No messages yet
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% if conv.last_message and not conv.last_message.is_read and conv.last_message.receiver_id == current_user.id %}
+                        <span class="unread-dot" title="Unread"></span>
+                        {% endif %}
+                    </a>
                     {% endfor %}
                 </div>
                 {% else %}
-                <div class="conversation">
-                    <p>No messages yet. Start trading to connect with verified partners!</p>
+                <div class="chat-empty">
+                    <p>No messages yet. Start trading to connect with verified partners.</p>
                 </div>
                 {% endif %}
             </div>
+            {% if selected_user %}
+            <div class="chat-pane">
+                <div class="chat-pane-header">
+                    <div class="chat-pane-title">
+                        <div class="chat-avatar large">{{ (selected_user.company_name or selected_user.full_name or selected_user.email)[0]|upper }}</div>
+                        <div class="chat-pane-meta">
+                            <h4>{{ selected_user.company_name or selected_user.full_name or selected_user.email }}</h4>
+                            <p>{{ selected_user.email }}</p>
+                        </div>
+                    </div>
+                    <span class="typing-indicator" id="typing-indicator">Typing...</span>
+                </div>
 
-            <div class="message-thread">
-                <h4>Message Thread</h4>
-                <div class="thread-content">
-                    <p>Select a conversation to view messages.</p>
+                <div class="chat-messages" id="chat-messages" data-user-id="{{ selected_user.id }}">
+                    {% for message in messages %}
+                    <div class="chat-bubble {{ 'sent' if message.sender_id == current_user.id else 'received' }}" data-message-id="{{ message.id }}">
+                        <div class="chat-bubble-meta">
+                            <span class="chat-sender">{{ message.sender.company_name or message.sender.full_name or message.sender.email }}</span>
+                            <span class="chat-time">{{ message.timestamp.strftime('%b %d, %H:%M') }}</span>
+                        </div>
+                        {% if message.subject %}
+                        <div class="chat-subject">{{ message.subject }}</div>
+                        {% endif %}
+                        {% if message.content %}
+                        <div class="chat-content">{{ message.content }}</div>
+                        {% endif %}
+                        {% if message.attachments %}
+                        <div class="chat-attachments">
+                            {% for att in message.attachments %}
+                            <a class="attachment-link" href="{{ url_for('main.message_attachment', attachment_id=att.id) }}">{{ att.original_filename }}</a>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <form class="chat-composer" method="POST" action="{{ url_for('main.send_message') }}" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <input type="hidden" name="receiver_id" value="{{ selected_user.id }}">
+                    <div class="chat-inputs">
+                        <input type="text" name="subject" placeholder="Subject (optional)">
+                        <textarea name="content" id="chat-input" placeholder="Type your message..."></textarea>
+                        <input type="file" name="attachments" multiple>
+                    </div>
+                    <button type="submit" class="btn-primary">Send</button>
+                </form>
+            </div>
+            {% else %}
+            <div class="chat-pane chat-placeholder">
+                <div class="chat-pane-header">
+                    <h4>Select a conversation</h4>
+                    <p>Choose a chat on the left to view messages.</p>
                 </div>
             </div>
+            {% endif %}
         </section>
 
     </main>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+const searchInput = document.getElementById('chat-search');
+const suggestionsEl = document.getElementById('chat-suggestions');
+let escrowSuggestions = [];
+let suggestionsLoaded = false;
+if (searchInput) {
+    searchInput.addEventListener('input', function () {
+        const term = this.value.trim().toLowerCase();
+        document.querySelectorAll('.chat-item').forEach(item => {
+            const name = item.dataset.name || '';
+            const email = item.dataset.email || '';
+            const matches = name.includes(term) || email.includes(term);
+            item.style.display = matches ? 'flex' : 'none';
+        });
+        renderSuggestions(term);
+    });
+
+    searchInput.addEventListener('focus', async () => {
+        if (!suggestionsLoaded) {
+            const res = await fetch('/api/messages/escrow-suggestions');
+            if (res.ok) {
+                const payload = await res.json();
+                escrowSuggestions = payload.users || [];
+                suggestionsLoaded = true;
+            }
+        }
+        renderSuggestions(searchInput.value.trim().toLowerCase());
+    });
+
+    document.addEventListener('click', (e) => {
+        if (suggestionsEl && !suggestionsEl.contains(e.target) && e.target !== searchInput) {
+            suggestionsEl.style.display = 'none';
+        }
+    });
+}
+
+function renderSuggestions(term) {
+    if (!suggestionsEl) return;
+    if (!escrowSuggestions.length) {
+        suggestionsEl.style.display = 'none';
+        return;
+    }
+    const filtered = escrowSuggestions.filter(u =>
+        u.name.toLowerCase().includes(term) || u.email.toLowerCase().includes(term)
+    );
+    if (!filtered.length) {
+        suggestionsEl.style.display = 'none';
+        return;
+    }
+    suggestionsEl.innerHTML = filtered.map(u =>
+        `<button type="button" class="suggestion-item" data-id="${u.id}">
+            <span class="suggestion-name">${u.name}</span>
+            <span class="suggestion-email">${u.email}</span>
+         </button>`
+    ).join('');
+    suggestionsEl.style.display = 'block';
+    suggestionsEl.querySelectorAll('.suggestion-item').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const id = btn.getAttribute('data-id');
+            window.location.href = `/messages?user_id=${id}`;
+        });
+    });
+}
+
+const newButton = document.getElementById('chat-new');
+const newPanel = document.getElementById('chat-new-panel');
+if (newButton && newPanel) {
+    const preferredId = newButton.getAttribute('data-preferred-user-id');
+    newPanel.style.display = preferredId ? 'none' : 'block';
+    newButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        const preferredUserId = newButton.getAttribute('data-preferred-user-id');
+        if (preferredUserId) {
+            window.location.href = `/messages?user_id=${preferredUserId}`;
+            return;
+        }
+        const isVisible = newPanel.style.display === 'block';
+        newPanel.style.display = isVisible ? 'none' : 'block';
+    });
+}
+
+const typingIndicator = document.getElementById('typing-indicator');
+const chatInput = document.getElementById('chat-input');
+let typingTimer = null;
+if (chatInput && typingIndicator) {
+    typingIndicator.style.display = 'none';
+    chatInput.addEventListener('input', () => {
+        typingIndicator.style.display = 'inline-flex';
+        clearTimeout(typingTimer);
+        typingTimer = setTimeout(() => {
+            typingIndicator.style.display = 'none';
+        }, 1200);
+    });
+}
+
+function appendMessage(message, currentUserId) {
+    const container = document.getElementById('chat-messages');
+    if (!container) return;
+    const bubble = document.createElement('div');
+    bubble.className = 'chat-bubble ' + (message.sender_id === currentUserId ? 'sent' : 'received');
+    bubble.dataset.messageId = message.id;
+
+    const meta = document.createElement('div');
+    meta.className = 'chat-bubble-meta';
+    const sender = document.createElement('span');
+    sender.className = 'chat-sender';
+    sender.textContent = message.sender_id === currentUserId ? 'You' : 'Partner';
+    const time = document.createElement('span');
+    time.className = 'chat-time';
+    time.textContent = new Date(message.timestamp).toLocaleString();
+    meta.append(sender, time);
+
+    bubble.append(meta);
+    if (message.subject) {
+        const subject = document.createElement('div');
+        subject.className = 'chat-subject';
+        subject.textContent = message.subject;
+        bubble.append(subject);
+    }
+    if (message.content) {
+        const content = document.createElement('div');
+        content.className = 'chat-content';
+        content.textContent = message.content;
+        bubble.append(content);
+    }
+    if (message.attachments && message.attachments.length) {
+        const attachmentWrap = document.createElement('div');
+        attachmentWrap.className = 'chat-attachments';
+        message.attachments.forEach(att => {
+            const link = document.createElement('a');
+            link.className = 'attachment-link';
+            link.href = att.url;
+            link.textContent = att.name;
+            attachmentWrap.append(link);
+        });
+        bubble.append(attachmentWrap);
+    }
+
+    container.append(bubble);
+    container.scrollTop = container.scrollHeight;
+}
+const messagesContainer = document.getElementById('chat-messages');
+let lastMessageId = null;
+if (messagesContainer) {
+    const last = messagesContainer.querySelector('.chat-bubble:last-child');
+    if (last) lastMessageId = parseInt(last.dataset.messageId, 10);
+
+    const currentUserId = {{ current_user.id }};
+    const otherUserId = parseInt(messagesContainer.dataset.userId, 10);
+
+    setInterval(async () => {
+        if (!otherUserId) return;
+        const url = new URL(`/api/messages/thread/${otherUserId}`, window.location.origin);
+        if (lastMessageId) url.searchParams.set('since_id', String(lastMessageId));
+        const res = await fetch(url.toString());
+        if (!res.ok) return;
+        const payload = await res.json();
+        if (!payload.messages || !payload.messages.length) return;
+        payload.messages.forEach(msg => {
+            lastMessageId = msg.id;
+            appendMessage(msg, currentUserId);
+        });
+    }, 5000);
+}
+});
+</script>
 {% endblock %}

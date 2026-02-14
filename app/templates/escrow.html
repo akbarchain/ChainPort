@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+x{% extends "base.html" %}
 
 {% block title %}Escrow Wallet | ChainPort{% endblock %}
 
@@ -33,7 +33,7 @@
         <section class="escrow-section">
             <div class="balance-card">
                 <h4>Current Escrow Balance</h4>
-                <p class="balance">₹{{ "%.2f"|format(user.escrow_balance) }}</p>
+                <p class="balance">&#8377;{{ "%.2f"|format(user.escrow_balance) }}</p>
             </div>
 
             <div class="escrow-actions">
@@ -46,7 +46,7 @@
                 <form method="POST" action="{{ url_for('main.escrow_deposit') }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <div class="form-group">
-                        <label for="deposit-amount">Amount ($)</label>
+                        <label for="deposit-amount">Amount (INR)</label>
                         <input type="number" id="deposit-amount" name="amount" step="0.01" min="0.01" required>
                     </div>
                     <button type="submit" class="btn-primary">Deposit</button>
@@ -59,7 +59,7 @@
                 <form method="POST" action="{{ url_for('main.escrow_withdraw') }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <div class="form-group">
-                        <label for="withdraw-amount">Amount ($)</label>
+                        <label for="withdraw-amount">Amount (INR)</label>
                         <input type="number" id="withdraw-amount" name="amount" step="0.01" min="0.01" max="{{ user.escrow_balance }}" required>
                     </div>
                     <button type="submit" class="btn-primary">Withdraw</button>
@@ -76,26 +76,28 @@
                         <th>Amount</th>
                         <th>Date</th>
                         <th>Status</th>
+                        <th>Report</th>
                     </tr>
                 </thead>
                 <tbody>
-                {% for transaction in transactions %}
-                    <tr>
-                        <td>#ET{{ transaction.id }}</td>
-                        <td>{{ transaction.transaction_type.title() }}</td>
-                        <td>₹{{ "%.2f"|format(transaction.amount) }}</td>
-                        <td>{{ transaction.created_at.strftime('%Y-%m-%d') }}</td>
-                        <td class="status {{ transaction.status }}">{{ transaction.status.title() }}</td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        </section>
-                        <th>Status</th>
-                        <th>Date</th>
-                    </tr>
-                </thead>
-                <tbody>
+                {% if transactions %}
+                    {% for transaction in transactions %}
+                        <tr>
+                            <td>#ET{{ transaction.id }}</td>
+                            <td>{{ transaction.transaction_type.title() }}</td>
+                            <td>&#8377;{{ "%.2f"|format(transaction.amount) }}</td>
+                            <td>{{ transaction.created_at.strftime('%Y-%m-%d') }}</td>
+                            <td class="status {{ transaction.status }}">{{ transaction.status.title() }}</td>
+                            <td>
+                                {% if transaction.trade_id %}
+                                    <a class="btn-secondary" href="{{ url_for('main.trade_report', trade_id=transaction.trade_id, tx_id=transaction.id) }}" target="_blank">Download PDF</a>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% else %}
                     <tr>
                         <td>No transactions yet</td>
                         <td>-</td>
@@ -103,6 +105,7 @@
                         <td>-</td>
                         <td>-</td>
                     </tr>
+                {% endif %}
                 </tbody>
             </table>
         </section>

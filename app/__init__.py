@@ -7,19 +7,30 @@ def create_app():
     app = Flask(__name__)
 
     # Configuration
-    app.config["SECRET_KEY"] = (
-        os.environ.get("SECRET_KEY") or "chainport-dev-secret-change-in-production"
-    )
+    debug_env = os.environ.get("FLASK_DEBUG") == "1"
+    secret_key = os.environ.get("SECRET_KEY")
+    if not secret_key:
+        if debug_env:
+            secret_key = "chainport-dev-secret-change-in-production"
+        else:
+            # Avoid a static secret in non-debug runs.
+            secret_key = os.urandom(32).hex()
+    app.config["SECRET_KEY"] = secret_key
     app.config["SQLALCHEMY_DATABASE_URI"] = (
         os.environ.get("DATABASE_URL") or "sqlite:///chainport.db"
     )
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-    app.config["UPLOAD_FOLDER"] = os.path.join(app.root_path, "static", "uploads")
+    app.config["UPLOAD_FOLDER"] = os.path.join(app.instance_path, "uploads")
+    app.config["MESSAGE_UPLOAD_FOLDER"] = os.path.join(
+        app.instance_path, "uploads", "messages"
+    )
     app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB max file size
+    app.config["MESSAGE_ATTACHMENT_LIMIT"] = 5
     app.config["ALLOWED_EXTENSIONS"] = {"pdf", "png", "jpg", "jpeg", "doc", "docx"}
 
     # Ensure upload folder exists
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+    os.makedirs(app.config["MESSAGE_UPLOAD_FOLDER"], exist_ok=True)
 
     # Initialize extensions
     db.init_app(app)
@@ -35,7 +46,7 @@ def create_app():
     def load_user(user_id):
         from app.models import User
 
-        return User.query.get(int(user_id))
+        return db.session.get(User, int(user_id))
 
     # Register blueprints
     from app.routes import main_bp

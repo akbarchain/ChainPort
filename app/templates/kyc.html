@@ -41,16 +41,16 @@
             <form class="kyc-form" method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <label>Business Registration Number</label>
-                <input type="text" placeholder="Enter registration number">
+                <input type="text" name="business_registration" placeholder="Enter registration number">
 
                 <label>Tax ID</label>
-                <input type="text" placeholder="Enter tax ID">
+                <input type="text" name="tax_id" placeholder="Enter tax ID">
 
                 <label>Upload Business License</label>
-                <input type="file" accept=".pdf,.jpg,.png">
+                <input type="file" name="documents" accept=".pdf,.jpg,.png">
 
                 <label>Upload ID Document</label>
-                <input type="file" accept=".pdf,.jpg,.png">
+                <input type="file" name="documents" accept=".pdf,.jpg,.png">
 
                 <button type="submit">Submit for Verification</button>
             </form>
