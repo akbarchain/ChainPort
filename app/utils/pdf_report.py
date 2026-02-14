@@ -1,5 +1,7 @@
 from io import BytesIO
 from datetime import datetime
+import os
+from flask import current_app
 
 def create_trade_pdf(trade, tx=None):
     """Generate a refined PDF report for a trade and optional escrow transaction.
@@ -31,6 +33,55 @@ def create_trade_pdf(trade, tx=None):
     normal = styles["Normal"]
 
     elements = []
+
+    # Optional logo (centered) if present in static/images/logo.png
+    try:
+        logo_path = os.path.join(current_app.root_path, "static", "images", "logo.png")
+    except Exception:
+        logo_path = None
+
+    if logo_path and os.path.exists(logo_path):
+        try:
+            from reportlab.platypus import Image as RLImage
+            try:
+                from PIL import Image as PILImage
+            except Exception:
+                PILImage = None
+
+            # Define pleasing maximum dimensions for the logo in the PDF
+            max_width = 70 * mm
+            max_height = 24 * mm
+
+            if PILImage is not None:
+                with PILImage.open(logo_path) as pi:
+                    w_px, h_px = pi.size
+                    # compute aspect and scale to fit within max box
+                    img_ratio = w_px / float(h_px)
+                    box_ratio = (max_width / float(max_height))
+                    if img_ratio > box_ratio:
+                        # wide image: limit by width
+                        target_w = max_width
+                        target_h = max_width / img_ratio
+                    else:
+                        # tall image: limit by height
+                        target_h = max_height
+                        target_w = max_height * img_ratio
+            else:
+                # Fallback size if Pillow not available
+                target_w = max_width
+                target_h = None
+
+            if target_h is not None:
+                img = RLImage(logo_path, width=target_w, height=target_h)
+            else:
+                img = RLImage(logo_path, width=target_w)
+
+            img.hAlign = "CENTER"
+            elements.append(img)
+            elements.append(Spacer(1, 6))
+        except Exception:
+            # If image fails, continue without it
+            pass
 
     # Centered title
     elements.append(Paragraph("ChainPort - Trade Report", title_style))
