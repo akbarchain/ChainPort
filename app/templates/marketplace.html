@@ -5,147 +5,30 @@
 {% block content %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/marketplace.css') }}">
 
-<div class="layout">
+<div class="market-simple">
+    <header>
+        <h2>Marketplace — Demo View</h2>
+        <p class="subtitle">A quick preview of listings</p>
+    </header>
 
-    <!-- Sidebar -->
-    <aside class="sidebar">
-        <h2><a href="{{ url_for('main.dashboard') }}">ChainPort</a></h2>
-        <nav>
-            <a href="{{ url_for('main.dashboard') }}">Dashboard</a>
-            <a class="active" href="{{ url_for('main.marketplace') }}">Marketplace</a>
-            <a href="{{ url_for('main.trades') }}">My Trades</a>
-            <a href="{{ url_for('main.escrow') }}">Escrow Wallet</a>
-            <a href="{{ url_for('main.messages') }}">Messages</a>
-            <a class="logout" href="{{ url_for('auth.logout') }}">Logout</a>
-        </nav>
-    </aside>
-
-    <!-- Main -->
-    <main class="main">
-
-        <header class="market-header">
-            <div>
-                <h2>Industrial Marketplace</h2>
-                <p class="market-subtitle">
-                    {% if products.total is defined %}
-                    {{ products.total }} products available
-                    {% else %}
-                    Verified B2B listings
-                    {% endif %}
+    <div class="products-grid">
+        {% for product in products %}
+        <div class="card">
+            <div class="card-image">
+                <img src="{{ product.image_url }}" alt="{{ product.title }}" loading="lazy" onerror="this.src='{{ url_for('static', filename='images/product_placeholder.svg') }}'">
+            </div>
+            <div class="card-body">
+                <h3>{{ product.title }}</h3>
+                <p class="seller">{{ product.seller.company_name }}</p>
+                <p class="price">₹{{ "%.2f"|format(product.price_per_unit) }} <small>/ {{ product.unit }}</small></p>
+                <p class="category">Category: {{ product.category }}</p>
+                <p>
+                    <a class="btn" href="{{ url_for('main.product_detail', product_id=product.id) }}">View</a>
                 </p>
             </div>
-            <form method="GET" action="{{ url_for('main.marketplace') }}" class="market-search">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <input type="text" name="search" placeholder="Search products, HS code, country" value="{{ search }}">
-                <button type="submit">Search</button>
-            </form>
-        </header>
-
-        <div class="market-layout">
-            <aside class="filter-panel">
-                <h4>Filters</h4>
-                <form method="GET" action="{{ url_for('main.marketplace') }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                    <label for="search">Keyword</label>
-                    <input type="text" id="search" name="search" placeholder="Search keywords" value="{{ search }}">
-
-                    <label for="category">Category</label>
-                    <select id="category" name="category">
-                        <option value="">All categories</option>
-                        {% for cat in categories %}
-                        <option value="{{ cat }}" {{ 'selected' if cat == selected_category else '' }}>{{ cat.replace('-', ' ').title() }}</option>
-                        {% endfor %}
-                    </select>
-
-                    <label for="country">Country</label>
-                    <select id="country" name="country">
-                        <option value="">All countries</option>
-                        {% for country in countries %}
-                        <option value="{{ country }}" {{ 'selected' if country == selected_country else '' }}>{{ country }}</option>
-                        {% endfor %}
-                    </select>
-
-                    <label for="verified">Seller verification</label>
-                    <select id="verified" name="verified">
-                        <option value="">All sellers</option>
-                        <option value="true" {{ 'selected' if selected_verified == 'true' else '' }}>Verified only</option>
-                        <option value="false" {{ 'selected' if selected_verified == 'false' else '' }}>Unverified only</option>
-                    </select>
-
-                    <button type="submit">Apply Filters</button>
-                    <a href="{{ url_for('main.marketplace') }}" class="btn-secondary">Clear Filters</a>
-                </form>
-            </aside>
-
-            <section class="results-panel">
-                {% if products.items %}
-                <div class="results-grid">
-                    {% for product in products.items %}
-                    <article class="product-card">
-                        <div class="product-image">
-                            <img src="{{ product.image_url }}" alt="{{ product.title }}" loading="lazy"
-                                 onerror="this.style.display='none'; this.parentElement.classList.add('fallback')">
-                            <span class="fallback-initial">{{ product.title[:1]|upper }}</span>
-                        </div>
-                        <div class="product-body">
-                            <h3>{{ product.title }}</h3>
-                            <p class="seller">
-                                {{ product.seller.company_name or product.seller.full_name or product.seller.email }}
-                            </p>
-                            <div class="price-row">
-                                <span class="price">&#8377;{{ "%.2f"|format(product.price_per_unit) }}</span>
-                                <span class="unit">per {{ product.unit }}</span>
-                            </div>
-                            <div class="meta">
-                                <span>MOQ: {{ product.min_order_quantity or 0 }} {{ product.unit }}</span>
-                                <span>Incoterm: {{ product.delivery_terms or 'Not specified' }}</span>
-                                {% if product.country_of_origin %}
-                                <span>Origin: {{ product.country_of_origin }}</span>
-                                {% endif %}
-                                {% if product.hs_code %}
-                                <span>HS Code: {{ product.hs_code }}</span>
-                                {% endif %}
-                            </div>
-                            <div class="badges">
-                                <span class="badge {{ 'verified' if product.seller.is_verified else 'pending' }}">
-                                    {{ 'Verified Seller' if product.seller.is_verified else 'Verification Pending' }}
-                                </span>
-                            </div>
-                            <a href="{{ url_for('main.product_detail', product_id=product.id) }}" class="btn-primary">View & Trade</a>
-                        </div>
-                    </article>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <div class="no-products">
-                    <p>No products found matching your criteria. Try adjusting your filters.</p>
-                </div>
-                {% endif %}
-
-                {% if products.pages > 1 %}
-                <section class="pagination">
-                    {% if products.has_prev %}
-                    <a href="{{ url_for('main.marketplace', page=products.prev_num, search=search, category=selected_category, country=selected_country, verified=selected_verified) }}">&laquo; Previous</a>
-                    {% endif %}
-
-                    {% for page_num in products.iter_pages() %}
-                    {% if page_num %}
-                    <a href="{{ url_for('main.marketplace', page=page_num, search=search, category=selected_category, country=selected_country, verified=selected_verified) }}"
-                       class="{{ 'active' if page_num == products.page else '' }}">{{ page_num }}</a>
-                    {% else %}
-                    <span>...</span>
-                    {% endif %}
-                    {% endfor %}
-
-                    {% if products.has_next %}
-                    <a href="{{ url_for('main.marketplace', page=products.next_num, search=search, category=selected_category, country=selected_country, verified=selected_verified) }}">Next &raquo;</a>
-                    {% endif %}
-                </section>
-                {% endif %}
-            </section>
         </div>
-
-    </main>
+        {% endfor %}
+    </div>
 </div>
 
 {% endblock %}

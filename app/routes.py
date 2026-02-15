@@ -181,49 +181,6 @@ def upload_product_image(product_id):
     return redirect(url_for('main.product_detail', product_id=product.id))
 
 
-def product_image_url(product):
-    title = (getattr(product, "title", "") or "").lower()
-    category = (getattr(product, "category", "") or "").lower()
-
-    filename_map = {
-        "plywood": "plywood.jpg",
-        "adhesive": "adhesive.jpg",
-        "fabric": "fabric.jpg",
-        "fiber glass": "fiberglass.jpg",
-        "fiberglass": "fiberglass.jpg",
-        "epoxy resin": "epoxy.jpg",
-        "polyurethane foam": "foam.jpg",
-        "acrylic": "paint.jpg",
-        "floor coating": "coating.jpg",
-        "solvent": "solvent.jpg",
-        "pipe": "pipes.jpg",
-        "rice": "agriculture.jpg",
-        "spice": "agriculture.jpg",
-        "cashew": "agriculture.jpg",
-        "cotton": "textiles.jpg",
-        "silk": "textiles.jpg",
-        "yarn": "textiles.jpg",
-    }
-
-    filename = None
-    for key, mapped_name in filename_map.items():
-        if key in title:
-            filename = mapped_name
-            break
-
-    if not filename:
-        if "textile" in category:
-            filename = "textiles.jpg"
-        elif "chemical" in category:
-            filename = "solvent.jpg"
-        elif "agri" in category:
-            filename = "agriculture.jpg"
-        else:
-            filename = "default.jpg"
-
-    return url_for("static", filename=f"images/products/{filename}")
-
-
 def _serialize_message(msg):
     return {
         "id": msg.id,
@@ -285,66 +242,37 @@ def dashboard():
 @main_bp.route("/marketplace")
 @login_required
 def marketplace():
-    page = request.args.get("page", 1, type=int)
-    per_page = 12
+    # FAKE SELLER CLASS
+    class Seller:
+        def __init__(self, name, verified=True):
+            self.company_name = name
+            self.full_name = name
+            self.email = name.lower().replace(" ", "") + "@chainport.com"
+            self.is_verified = verified
 
-    # Get filter parameters
-    search = request.args.get("search", "")
-    category = request.args.get("category", "")
-    country = request.args.get("country", "")
-    verified = request.args.get("verified", "")
+    # FAKE PRODUCT CLASS
+    class ProductDemo:
+        def __init__(self, id, title, price, unit, seller, image_url=None, category=None):
+            self.id = id
+            self.title = title
+            self.price_per_unit = price
+            self.unit = unit
+            self.seller = seller
+            self.seller_id = None
+            self.image_url = image_url or url_for('static', filename='images/product_placeholder.svg')
+            self.category = category or 'General'
 
-    query = Product.query.filter_by(is_active=True)
+    # Create a few demo sellers/products for the marketplace preview
+    s1 = Seller('ACME Exports', True)
+    s2 = Seller('Global Traders', False)
 
-    if search:
-        query = query.filter(
-            (Product.title.contains(search))
-            | (Product.description.contains(search))
-            | (Product.hs_code.contains(search))
-        )
+    demo_products = [
+        ProductDemo(1, 'Premium Basmati Rice', 120.0, 'kg', s1, url_for('static', filename='images/products/agriculture.jpg'), 'agriculture'),
+        ProductDemo(2, 'Industrial Plywood Sheets', 2500.0, 'sheet', s2, url_for('static', filename='images/products/plywood.jpg'), 'plywood'),
+        ProductDemo(3, 'High-Grade Epoxy Resin', 850.0, 'kg', s1, url_for('static', filename='images/products/epoxy.jpg'), 'chemical'),
+    ]
 
-    if category:
-        query = query.filter_by(category=category)
-
-    if country:
-        query = query.filter_by(country_of_origin=country)
-
-    if verified:
-        if verified.lower() == "true":
-            query = query.join(User, Product.seller_id == User.id).filter(User.is_verified == True)
-        elif verified.lower() == "false":
-            query = query.join(User, Product.seller_id == User.id).filter(User.is_verified == False)
-
-    products = query.paginate(page=page, per_page=per_page, error_out=False)
-    # product.image_url is provided by the Product model; no assignment needed
-
-    # Get unique categories and countries for filters
-    categories = (
-        db.session.query(Product.category)
-        .filter(Product.category.isnot(None))
-        .distinct()
-        .all()
-    )
-    categories = [cat[0] for cat in categories]
-
-    countries = (
-        db.session.query(Product.country_of_origin)
-        .filter(Product.country_of_origin.isnot(None))
-        .distinct()
-        .all()
-    )
-    countries = [country[0] for country in countries]
-
-    return render_template(
-        "marketplace.html",
-        products=products,
-        categories=categories,
-        countries=countries,
-        search=search,
-        selected_category=category,
-        selected_country=country,
-        selected_verified=verified,
-    )
+    return render_template('marketplace.html', products=demo_products)
 
 
 @main_bp.route("/product/<int:product_id>")
