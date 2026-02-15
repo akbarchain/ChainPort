@@ -127,6 +127,7 @@ def upload_product_image(product_id):
         return redirect(url_for('main.product_detail', product_id=product.id))
 
     ALLOWED = {'png', 'jpg', 'jpeg', 'webp', 'svg'}
+    MAX_BYTES = 2 * 1024 * 1024  # 2 MB
     if file and allowed_file(file.filename, ALLOWED):
         filename = secure_filename(file.filename)
         ext = filename.rsplit('.', 1)[1].lower()
@@ -137,6 +138,13 @@ def upload_product_image(product_id):
         dest_name = f"{product.id}.{ext}"
         dest_path = os.path.join(uploads_dir, dest_name)
 
+        # Read file into memory first to enforce size limits
+        from io import BytesIO
+        data = file.read()
+        if len(data) > MAX_BYTES:
+            flash('Image too large. Maximum size is 2 MB.', 'error')
+            return redirect(url_for('main.product_detail', product_id=product.id))
+
         # Remove existing images for this product with other extensions
         for cand_ext in ALLOWED:
             cand = os.path.join(uploads_dir, f"{product.id}.{cand_ext}")
@@ -146,17 +154,22 @@ def upload_product_image(product_id):
             except Exception:
                 pass
 
-        # Save file and optionally resize if Pillow available
+        # Save uploaded bytes
         try:
-            file.save(dest_path)
+            with open(dest_path, 'wb') as f:
+                f.write(data)
+
+            # Create a standard JPG thumbnail (preserve aspect) if Pillow available
             try:
                 from PIL import Image
-                with Image.open(dest_path) as im:
-                    im.thumbnail((1200, 1200))
-                    im.save(dest_path)
+                img_buf = BytesIO(data)
+                with Image.open(img_buf) as im:
+                    im = im.convert('RGB')
+                    im.thumbnail((800, 800))
+                    thumb_path = os.path.join(uploads_dir, f"{product.id}_thumb.jpg")
+                    im.save(thumb_path, format='JPEG', quality=85)
             except Exception:
-                # Pillow not available or resizing failed; continue
-                pass
+                thumb_path = None
 
             flash('Product image uploaded successfully.', 'success')
         except Exception as e:

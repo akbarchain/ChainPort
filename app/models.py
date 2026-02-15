@@ -92,6 +92,12 @@ class Product(db.Model):
 
             # Look for common image extensions named by product id
             uploads_dir = os.path.join(current_app.static_folder, "uploads", "products")
+            # Prefer a generated thumbnail if present
+            thumb_name = f"{self.id}_thumb.jpg"
+            thumb_path = os.path.join(uploads_dir, thumb_name)
+            if os.path.exists(thumb_path):
+                return url_for("static", filename=f"uploads/products/{thumb_name}")
+
             candidates = [f"{self.id}.png", f"{self.id}.jpg", f"{self.id}.jpeg", f"{self.id}.webp", f"{self.id}.svg"]
             for fname in candidates:
                 path = os.path.join(uploads_dir, fname)
