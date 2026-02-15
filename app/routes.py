@@ -207,10 +207,13 @@ def index():
     return render_template("index.html")
 
 
-# Dashboard (protected)
+# Dashboard (public + user)
 @main_bp.route("/dashboard")
-@login_required
 def dashboard():
+    # If user is not authenticated, show a public demo dashboard
+    if not current_user.is_authenticated:
+        return render_template("dashboard_public.html")
+
     user = current_user
     trades = (
         Trade.query.filter((Trade.buyer_id == user.id) | (Trade.seller_id == user.id))
@@ -240,71 +243,58 @@ def dashboard():
 
 
 @main_bp.route("/marketplace")
-@login_required
 def marketplace():
-    page = request.args.get("page", type=int, default=1)
+    page = request.args.get("page", 1, type=int)
     per_page = 9
 
-    search = (request.args.get("search") or "").strip()
-    selected_category = (request.args.get("category") or "").strip()
-    selected_country = (request.args.get("country") or "").strip()
-    selected_verified = (request.args.get("verified") or "").strip()  # "true" / "false" / ""
+    search = request.args.get("search", "").strip()
+    selected_category = request.args.get("category", "")
+    selected_country = request.args.get("country", "")
+    selected_verified = request.args.get("verified", "")
 
     # Base query
-    query = Product.query
+    query = Product.query.join(User)
 
-    # Join seller only if you filter by verification or need seller fields in template
-    # (Assumes Product.seller relationship exists: Product.seller -> User)
-    query = query.join(User, Product.seller_id == User.id)
+    # Only active listings
+    query = query.filter(Product.is_active == True)
 
-    # Filters
+    # Search
     if search:
         like = f"%{search.lower()}%"
         query = query.filter(
             db.or_(
                 db.func.lower(Product.title).like(like),
-                db.func.lower(Product.category).like(like),
+                db.func.lower(Product.description).like(like),
                 db.func.lower(Product.hs_code).like(like),
+                db.func.lower(Product.category).like(like),
                 db.func.lower(Product.country_of_origin).like(like),
                 db.func.lower(User.company_name).like(like),
-                db.func.lower(User.email).like(like),
             )
         )
 
+    # Category filter
     if selected_category:
         query = query.filter(Product.category == selected_category)
 
+    # Country filter
     if selected_country:
         query = query.filter(Product.country_of_origin == selected_country)
 
+    # Verification filter
     if selected_verified == "true":
-        query = query.filter(User.is_verified.is_(True))
+        query = query.filter(User.is_verified == True)
     elif selected_verified == "false":
-        query = query.filter(User.is_verified.is_(False))
+        query = query.filter(User.is_verified == False)
 
-    query = query.order_by(Product.created_at.desc() if hasattr(Product, "created_at") else Product.id.desc())
+    # Order newest first
+    query = query.order_by(Product.created_at.desc())
 
+    # Pagination
     products = query.paginate(page=page, per_page=per_page, error_out=False)
 
-    # Dropdown data (safe even if table empty)
-    categories = [r[0] for r in db.session.query(Product.category).distinct().order_by(Product.category).all() if r[0]]
-    countries = [r[0] for r in db.session.query(Product.country_of_origin).distinct().order_by(Product.country_of_origin).all() if r[0]]
-
-    # Ensure each product has image_url attribute for template
-    for p in products.items:
-        # If you have p.image_url stored in DB, keep it.
-        # Else, build from upload folder.
-        if not getattr(p, "image_url", None):
-            # If you store image filename in DB as p.image_filename, use it.
-            image_filename = getattr(p, "image_filename", None)
-            if image_filename:
-                p.image_url = url_for("static", filename=f"uploads/products/{image_filename}")
-            else:
-                p.image_url = url_for("static", filename="images/product_placeholder.svg")
-
-        # Make sure seller is available
-        if not getattr(p, "seller", None):
-            p.seller = db.session.get(User, p.seller_id)
+    # Dropdown data
+    categories = [c[0] for c in db.session.query(Product.category).distinct() if c[0]]
+    countries = [c[0] for c in db.session.query(Product.country_of_origin).distinct() if c[0]]
 
     return render_template(
         "marketplace.html",
