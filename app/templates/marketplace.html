@@ -83,7 +83,9 @@
                     {% for product in products.items %}
                     <article class="product-card">
                         <div class="product-image">
-                            <span>{{ product.title[:1]|upper }}</span>
+                            <img src="{{ product.image_url }}" alt="{{ product.title }}" loading="lazy"
+                                 onerror="this.style.display='none'; this.parentElement.classList.add('fallback')">
+                            <span class="fallback-initial">{{ product.title[:1]|upper }}</span>
                         </div>
                         <div class="product-body">
                             <h3>{{ product.title }}</h3>

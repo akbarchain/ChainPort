@@ -35,12 +35,23 @@ def create_trade_pdf(trade, tx=None):
     elements = []
 
     # Optional logo (centered) if present in static/images/logo.png
+    # Try several sensible locations for the logo
+    candidate_paths = []
     try:
-        logo_path = os.path.join(current_app.root_path, "static", "images", "logo.png")
+        candidate_paths.append(os.path.join(current_app.root_path, "static", "images", "logo.png"))
+        candidate_paths.append(os.path.join(current_app.static_folder, "images", "logo.png"))
     except Exception:
-        logo_path = None
+        pass
+    # Also try relative path (when running from project root)
+    candidate_paths.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "images", "logo.png"))
 
-    if logo_path and os.path.exists(logo_path):
+    found_logo = None
+    for p in candidate_paths:
+        if p and os.path.exists(p):
+            found_logo = p
+            break
+
+    if found_logo:
         try:
             from reportlab.platypus import Image as RLImage
             try:
@@ -52,29 +63,32 @@ def create_trade_pdf(trade, tx=None):
             max_width = 70 * mm
             max_height = 24 * mm
 
+            target_w = None
+            target_h = None
+
             if PILImage is not None:
-                with PILImage.open(logo_path) as pi:
+                with PILImage.open(found_logo) as pi:
                     w_px, h_px = pi.size
-                    # compute aspect and scale to fit within max box
                     img_ratio = w_px / float(h_px)
                     box_ratio = (max_width / float(max_height))
                     if img_ratio > box_ratio:
-                        # wide image: limit by width
                         target_w = max_width
                         target_h = max_width / img_ratio
                     else:
-                        # tall image: limit by height
                         target_h = max_height
                         target_w = max_height * img_ratio
             else:
-                # Fallback size if Pillow not available
                 target_w = max_width
-                target_h = None
 
-            if target_h is not None:
-                img = RLImage(logo_path, width=target_w, height=target_h)
+            # Load image into memory to avoid file-locking/platform issues
+            from io import BytesIO as _BytesIO
+            with open(found_logo, "rb") as f:
+                img_bytes = _BytesIO(f.read())
+
+            if target_w and target_h:
+                img = RLImage(img_bytes, width=target_w, height=target_h)
             else:
-                img = RLImage(logo_path, width=target_w)
+                img = RLImage(img_bytes, width=target_w)
 
             img.hAlign = "CENTER"
             elements.append(img)

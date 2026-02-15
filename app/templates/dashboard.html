@@ -9,6 +9,12 @@
 
     <!-- Sidebar -->
     <aside class="sidebar">
+        <h2>
+            <a href="{{ url_for('main.dashboard') }}" class="sidebar-brand">
+                <img src="{{ url_for('static', filename='images/logo-icon.png') }}" alt="ChainPort icon" class="logo-svg">
+                <span>ChainPort</span>
+            </a>
+        </h2>
         <nav>
             <a class="active" href="{{ url_for('main.dashboard') }}">Dashboard</a>
             <a href="{{ url_for('main.profile') }}">Business Profile</a>

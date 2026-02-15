@@ -9,6 +9,7 @@
 <header class="navbar">
     <div class="logo">
         <a href="{{ url_for('main.index') }}" class="logo-link">
+            <img src="{{ url_for('static', filename='images/logo-icon.png') }}" alt="ChainPort icon" class="logo-icon">
             <span class="logo-text">ChainPort</span>
         </a>
     </div>
@@ -25,6 +26,7 @@
 <!-- Hero Section -->
 <section class="hero">
     <div class="brand-center">
+        <img src="{{ url_for('static', filename='images/logo-icon.png') }}" alt="ChainPort icon" class="brand-icon">
         <div class="brand-title">ChainPort</div>
     </div>
     <h1>Verified B2B Trade.<br>Secured by Escrow.</h1>

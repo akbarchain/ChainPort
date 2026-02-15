@@ -53,6 +53,12 @@ body {
     color: var(--ink);
 }
 
+.logo-icon {
+    width: 34px;
+    height: 34px;
+    object-fit: contain;
+}
+
 .logo-text {
     font-weight: 700;
     letter-spacing: 0.5px;
@@ -153,6 +159,13 @@ body {
     align-items: center;
     gap: 4px;
     margin-bottom: 16px;
+}
+
+.brand-icon {
+    width: 92px;
+    height: 92px;
+    object-fit: contain;
+    margin-bottom: 6px;
 }
 
 .brand-title {
@@ -362,6 +375,11 @@ body {
 
     .brand-title {
         font-size: 40px;
+    }
+
+    .brand-icon {
+        width: 68px;
+        height: 68px;
     }
 
     .hero h1 {

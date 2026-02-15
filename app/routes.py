@@ -107,6 +107,49 @@ def allowed_file(filename, allowed_extensions):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in allowed_extensions
 
 
+def product_image_url(product):
+    title = (getattr(product, "title", "") or "").lower()
+    category = (getattr(product, "category", "") or "").lower()
+
+    filename_map = {
+        "plywood": "plywood.jpg",
+        "adhesive": "adhesive.jpg",
+        "fabric": "fabric.jpg",
+        "fiber glass": "fiberglass.jpg",
+        "fiberglass": "fiberglass.jpg",
+        "epoxy resin": "epoxy.jpg",
+        "polyurethane foam": "foam.jpg",
+        "acrylic": "paint.jpg",
+        "floor coating": "coating.jpg",
+        "solvent": "solvent.jpg",
+        "pipe": "pipes.jpg",
+        "rice": "agriculture.jpg",
+        "spice": "agriculture.jpg",
+        "cashew": "agriculture.jpg",
+        "cotton": "textiles.jpg",
+        "silk": "textiles.jpg",
+        "yarn": "textiles.jpg",
+    }
+
+    filename = None
+    for key, mapped_name in filename_map.items():
+        if key in title:
+            filename = mapped_name
+            break
+
+    if not filename:
+        if "textile" in category:
+            filename = "textiles.jpg"
+        elif "chemical" in category:
+            filename = "solvent.jpg"
+        elif "agri" in category:
+            filename = "agriculture.jpg"
+        else:
+            filename = "default.jpg"
+
+    return url_for("static", filename=f"images/products/{filename}")
+
+
 def _serialize_message(msg):
     return {
         "id": msg.id,
@@ -199,6 +242,7 @@ def marketplace():
             query = query.join(User, Product.seller_id == User.id).filter(User.is_verified == False)
 
     products = query.paginate(page=page, per_page=per_page, error_out=False)
+    # product.image_url is provided by the Product model; no assignment needed
 
     # Get unique categories and countries for filters
     categories = (
@@ -404,14 +448,18 @@ def messages():
 @main_bp.route("/messages/start", methods=["POST"])
 @login_required
 def start_message():
-    email = request.form.get("email", "").strip().lower()
-    if not email:
-        flash("Enter a valid email to start a chat.", "error")
-        return redirect(url_for("main.messages"))
+    user_id = request.form.get("user_id", type=int)
+    user = db.session.get(User, user_id) if user_id else None
 
-    user = User.query.filter_by(email=email).first()
+    if user is None:
+        email = request.form.get("email", "").strip().lower()
+        if not email:
+            flash("Enter a valid email to start a chat.", "error")
+            return redirect(url_for("main.messages"))
+        user = User.query.filter_by(email=email).first()
+
     if not user:
-        flash("No user found with that email.", "error")
+        flash("No user found for that chat request.", "error")
         return redirect(url_for("main.messages"))
 
     if user.id == current_user.id:
@@ -440,9 +488,38 @@ def send_message():
     timestamps.append(now)
     _MESSAGE_RATE_LIMIT[key] = timestamps
 
-    receiver_id = int(request.form.get("receiver_id"))
-    trade_id = request.form.get("trade_id")
-    subject = request.form.get("subject", "")
+    receiver_raw = (request.form.get("receiver_id") or "").strip()
+    if not receiver_raw:
+        flash("Select a conversation before sending a message.", "error")
+        return redirect(url_for("main.messages"))
+
+    try:
+        receiver_id = int(receiver_raw)
+    except ValueError:
+        flash("Invalid message recipient.", "error")
+        return redirect(url_for("main.messages"))
+
+    if receiver_id == current_user.id:
+        flash("You cannot message yourself.", "error")
+        return redirect(url_for("main.messages"))
+
+    receiver = db.session.get(User, receiver_id)
+    if not receiver:
+        flash("Message recipient not found.", "error")
+        return redirect(url_for("main.messages"))
+
+    trade_id_raw = (request.form.get("trade_id") or "").strip()
+    trade_id = None
+    if trade_id_raw:
+        try:
+            trade_id = int(trade_id_raw)
+        except ValueError:
+            flash("Invalid trade reference.", "error")
+            return redirect(url_for("main.messages", user_id=receiver.id))
+    subject = request.form.get("subject", "").strip()
+    if len(subject) > 200:
+        flash("Subject is too long (max 200 characters).", "error")
+        return redirect(url_for("main.messages", user_id=receiver.id))
     content = request.form.get("content", "").strip()
     uploaded_files = request.files.getlist("attachments")
 
@@ -467,8 +544,8 @@ def send_message():
 
     message = Message(
         sender_id=current_user.id,
-        receiver_id=receiver_id,
-        trade_id=int(trade_id) if trade_id else None,
+        receiver_id=receiver.id,
+        trade_id=trade_id,
         subject=subject,
         content=content,
     )
@@ -498,7 +575,7 @@ def send_message():
         db.session.commit()
 
     flash("Message sent successfully!", "success")
-    return redirect(request.referrer or url_for("main.messages"))
+    return redirect(url_for("main.messages", user_id=receiver.id))
 
 
 @main_bp.route("/messages/attachment/<int:attachment_id>")

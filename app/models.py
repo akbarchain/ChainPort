@@ -81,6 +81,29 @@ class Product(db.Model):
         onupdate=lambda: datetime.now(timezone.utc),
     )
 
+    @property
+    def image_url(self):
+        """Return a URL for the product image if present in static/uploads/products,
+        otherwise return a placeholder image URL.
+        """
+        try:
+            from flask import url_for, current_app
+            import os
+
+            # Look for common image extensions named by product id
+            uploads_dir = os.path.join(current_app.static_folder, "uploads", "products")
+            candidates = [f"{self.id}.png", f"{self.id}.jpg", f"{self.id}.jpeg", f"{self.id}.webp", f"{self.id}.svg"]
+            for fname in candidates:
+                path = os.path.join(uploads_dir, fname)
+                if os.path.exists(path):
+                    return url_for("static", filename=f"uploads/products/{fname}")
+
+            # Fallback placeholder
+            return url_for("static", filename="images/product_placeholder.svg")
+        except Exception:
+            # If not in app context or any error, return a relative path fallback
+            return "/static/images/product_placeholder.svg"
+
 
 class Trade(db.Model):
     id = db.Column(db.Integer, primary_key=True)
