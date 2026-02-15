@@ -242,37 +242,80 @@ def dashboard():
 @main_bp.route("/marketplace")
 @login_required
 def marketplace():
-    # FAKE SELLER CLASS
-    class Seller:
-        def __init__(self, name, verified=True):
-            self.company_name = name
-            self.full_name = name
-            self.email = name.lower().replace(" ", "") + "@chainport.com"
-            self.is_verified = verified
+    page = request.args.get("page", type=int, default=1)
+    per_page = 9
 
-    # FAKE PRODUCT CLASS
-    class ProductDemo:
-        def __init__(self, id, title, price, unit, seller, image_url=None, category=None):
-            self.id = id
-            self.title = title
-            self.price_per_unit = price
-            self.unit = unit
-            self.seller = seller
-            self.seller_id = None
-            self.image_url = image_url or url_for('static', filename='images/product_placeholder.svg')
-            self.category = category or 'General'
+    search = (request.args.get("search") or "").strip()
+    selected_category = (request.args.get("category") or "").strip()
+    selected_country = (request.args.get("country") or "").strip()
+    selected_verified = (request.args.get("verified") or "").strip()  # "true" / "false" / ""
 
-    # Create a few demo sellers/products for the marketplace preview
-    s1 = Seller('ACME Exports', True)
-    s2 = Seller('Global Traders', False)
+    # Base query
+    query = Product.query
 
-    demo_products = [
-        ProductDemo(1, 'Premium Basmati Rice', 120.0, 'kg', s1, url_for('static', filename='images/products/agriculture.jpg'), 'agriculture'),
-        ProductDemo(2, 'Industrial Plywood Sheets', 2500.0, 'sheet', s2, url_for('static', filename='images/products/plywood.jpg'), 'plywood'),
-        ProductDemo(3, 'High-Grade Epoxy Resin', 850.0, 'kg', s1, url_for('static', filename='images/products/epoxy.jpg'), 'chemical'),
-    ]
+    # Join seller only if you filter by verification or need seller fields in template
+    # (Assumes Product.seller relationship exists: Product.seller -> User)
+    query = query.join(User, Product.seller_id == User.id)
 
-    return render_template('marketplace.html', products=demo_products)
+    # Filters
+    if search:
+        like = f"%{search.lower()}%"
+        query = query.filter(
+            db.or_(
+                db.func.lower(Product.title).like(like),
+                db.func.lower(Product.category).like(like),
+                db.func.lower(Product.hs_code).like(like),
+                db.func.lower(Product.country_of_origin).like(like),
+                db.func.lower(User.company_name).like(like),
+                db.func.lower(User.email).like(like),
+            )
+        )
+
+    if selected_category:
+        query = query.filter(Product.category == selected_category)
+
+    if selected_country:
+        query = query.filter(Product.country_of_origin == selected_country)
+
+    if selected_verified == "true":
+        query = query.filter(User.is_verified.is_(True))
+    elif selected_verified == "false":
+        query = query.filter(User.is_verified.is_(False))
+
+    query = query.order_by(Product.created_at.desc() if hasattr(Product, "created_at") else Product.id.desc())
+
+    products = query.paginate(page=page, per_page=per_page, error_out=False)
+
+    # Dropdown data (safe even if table empty)
+    categories = [r[0] for r in db.session.query(Product.category).distinct().order_by(Product.category).all() if r[0]]
+    countries = [r[0] for r in db.session.query(Product.country_of_origin).distinct().order_by(Product.country_of_origin).all() if r[0]]
+
+    # Ensure each product has image_url attribute for template
+    for p in products.items:
+        # If you have p.image_url stored in DB, keep it.
+        # Else, build from upload folder.
+        if not getattr(p, "image_url", None):
+            # If you store image filename in DB as p.image_filename, use it.
+            image_filename = getattr(p, "image_filename", None)
+            if image_filename:
+                p.image_url = url_for("static", filename=f"uploads/products/{image_filename}")
+            else:
+                p.image_url = url_for("static", filename="images/product_placeholder.svg")
+
+        # Make sure seller is available
+        if not getattr(p, "seller", None):
+            p.seller = db.session.get(User, p.seller_id)
+
+    return render_template(
+        "marketplace.html",
+        products=products,
+        categories=categories,
+        countries=countries,
+        search=search,
+        selected_category=selected_category,
+        selected_country=selected_country,
+        selected_verified=selected_verified,
+    )
 
 
 @main_bp.route("/product/<int:product_id>")
