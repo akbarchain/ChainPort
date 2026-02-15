@@ -107,6 +107,67 @@ def allowed_file(filename, allowed_extensions):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in allowed_extensions
 
 
+@main_bp.route('/product/<int:product_id>/upload-image', methods=['POST'])
+@login_required
+def upload_product_image(product_id):
+    product = get_or_404(Product, product_id)
+
+    # only seller may upload product image
+    if product.seller_id != current_user.id:
+        flash('Permission denied: only the seller can upload product images.', 'error')
+        return redirect(url_for('main.product_detail', product_id=product.id))
+
+    if 'image' not in request.files:
+        flash('No file part in request.', 'error')
+        return redirect(url_for('main.product_detail', product_id=product.id))
+
+    file = request.files['image']
+    if file.filename == '':
+        flash('No file selected.', 'error')
+        return redirect(url_for('main.product_detail', product_id=product.id))
+
+    ALLOWED = {'png', 'jpg', 'jpeg', 'webp', 'svg'}
+    if file and allowed_file(file.filename, ALLOWED):
+        filename = secure_filename(file.filename)
+        ext = filename.rsplit('.', 1)[1].lower()
+
+        uploads_dir = os.path.join(current_app.static_folder, 'uploads', 'products')
+        os.makedirs(uploads_dir, exist_ok=True)
+
+        dest_name = f"{product.id}.{ext}"
+        dest_path = os.path.join(uploads_dir, dest_name)
+
+        # Remove existing images for this product with other extensions
+        for cand_ext in ALLOWED:
+            cand = os.path.join(uploads_dir, f"{product.id}.{cand_ext}")
+            try:
+                if os.path.exists(cand) and os.path.abspath(cand) != os.path.abspath(dest_path):
+                    os.remove(cand)
+            except Exception:
+                pass
+
+        # Save file and optionally resize if Pillow available
+        try:
+            file.save(dest_path)
+            try:
+                from PIL import Image
+                with Image.open(dest_path) as im:
+                    im.thumbnail((1200, 1200))
+                    im.save(dest_path)
+            except Exception:
+                # Pillow not available or resizing failed; continue
+                pass
+
+            flash('Product image uploaded successfully.', 'success')
+        except Exception as e:
+            flash(f'Failed to save image: {e}', 'error')
+
+    else:
+        flash('Invalid file type. Allowed: png, jpg, jpeg, webp, svg', 'error')
+
+    return redirect(url_for('main.product_detail', product_id=product.id))
+
+
 def product_image_url(product):
     title = (getattr(product, "title", "") or "").lower()
     category = (getattr(product, "category", "") or "").lower()

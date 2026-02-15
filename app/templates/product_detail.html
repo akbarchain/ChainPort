@@ -89,6 +89,15 @@
                 <a href="{{ url_for('main.create_trade', product_id=product.id) }}" class="btn-primary">Request Trade</a>
                 {% else %}
                 <p class="own-product">This is your product listing.</p>
+
+                <!-- Upload form for seller to add/replace product image -->
+                <form method="POST" action="{{ url_for('main.upload_product_image', product_id=product.id) }}" enctype="multipart/form-data" style="margin-top:12px;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <label for="image">Upload product image</label>
+                    <input type="file" id="image" name="image" accept="image/*" required>
+                    <button type="submit" class="btn-secondary">Upload</button>
+                </form>
+
                 {% endif %}
 
                 <a href="{{ url_for('main.marketplace') }}" class="btn-secondary">Back to Marketplace</a>
