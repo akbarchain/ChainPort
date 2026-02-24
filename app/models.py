@@ -1,7 +1,197 @@
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timezone
+from collections import defaultdict
+from functools import lru_cache
+import os
+import re
 from app.extensions import db
 from flask_login import UserMixin
+
+
+INDUSTRY_IMAGE_MAP = {
+    "agriculture": "agriculture.jpg",
+    "textile": "textiles.jpg",
+    "polymer_chemical": "epoxy.jpg",
+    "construction_material": "cement.jpg",
+    "mining_metal": "copper_cathode.jpg",
+    "petrochemical": "refinery.jpg",
+    "industrial_chemical": "solvent.jpg",
+    "packaging": "packaging.jpg",
+}
+
+PRODUCT_IMAGE_MAP = {
+    "premium basmati rice": "basmati_rice.jpg",
+    "aramid fabric": "aramid_fabric.jpg",
+    "kevlar fabric": "aramid_fabric.jpg",
+    "nomex fabric": "aramid_fabric.jpg",
+    "copper cathode": "copper_cathode.jpg",
+    "coal": "copper_cathode.jpg",
+    "spices": "spices.jpg",
+    "pigments": "solvent.jpg",
+    "concrete blocks": "cement.jpg",
+    "concrete slabs": "cement.jpg",
+}
+
+
+def _normalize_text(value):
+    return re.sub(r"\s+", " ", (value or "").strip().lower())
+
+
+def _normalize_match_text(value):
+    value = re.sub(r"[^a-z0-9\s]+", " ", (value or "").lower())
+    return re.sub(r"\s+", " ", value).strip()
+
+
+def classify_product_industry(title, category):
+    """Classify a product into one of ChainPort's industry groups."""
+    title_text = _normalize_text(title)
+    category_text = _normalize_text(category)
+    combined = f"{title_text} {category_text}".strip()
+    scores = defaultdict(int)
+
+    # High-confidence phrase matches from full title/category context.
+    phrase_rules = {
+        "textile": [
+            "aramid fabric",
+            "kevlar fiber",
+            "nomex fireproof fabric",
+            "fireproof fabric",
+            "cotton yarn",
+            "woven fabric",
+            "industrial textile",
+        ],
+        "mining_metal": [
+            "copper cathode",
+            "copper cathodes",
+            "thermal coal",
+            "metallurgical coal",
+            "iron ore",
+            "bauxite ore",
+        ],
+        "construction_material": [
+            "portland cement",
+            "white portland cement",
+            "concrete block",
+            "concrete blocks",
+            "building material",
+            "construction grade",
+        ],
+        "polymer_chemical": [
+            "epoxy resin",
+            "polyurethane resin",
+            "polymer resin",
+            "engineering polymer",
+        ],
+        "industrial_chemical": [
+            "industrial solvent",
+            "solvent blend",
+            "pigment paste",
+            "inorganic pigments",
+            "organic pigments",
+        ],
+        "petrochemical": [
+            "petrochemical feedstock",
+            "refinery naphtha",
+            "base oil",
+            "bitumen",
+            "fuel oil",
+        ],
+        "agriculture": [
+            "basmati rice",
+            "raw rice",
+            "agricultural commodity",
+            "grain export",
+            "pulse crop",
+        ],
+        "packaging": [
+            "corrugated box",
+            "kraft paper",
+            "packaging film",
+            "shrink wrap",
+            "ldpe bags",
+        ],
+    }
+
+    for industry, phrases in phrase_rules.items():
+        for phrase in phrases:
+            if phrase in combined:
+                scores[industry] += 8
+
+    # Token-level scoring to handle title variants.
+    token_rules = {
+        "agriculture": {"rice", "grain", "wheat", "maize", "corn", "soy", "pulse", "lentil", "cashew", "spice", "cottonseed"},
+        "textile": {"aramid", "kevlar", "nomex", "fabric", "fiber", "fibre", "yarn", "textile", "woven", "nonwoven"},
+        "polymer_chemical": {"epoxy", "polymer", "resin", "polyurethane", "polyamide", "polyester", "composite"},
+        "construction_material": {"cement", "concrete", "block", "brick", "mortar", "gypsum", "clinker", "rebar", "aggregate"},
+        "mining_metal": {"coal", "copper", "cathode", "ore", "aluminum", "aluminium", "zinc", "nickel", "iron", "steel"},
+        "petrochemical": {"petrochemical", "refinery", "naphtha", "bitumen", "diesel", "fuel", "lpg", "benzene", "toluene"},
+        "industrial_chemical": {"solvent", "pigment", "chemical", "thinner", "additive", "acid", "caustic", "surfactant"},
+        "packaging": {"packaging", "pack", "box", "carton", "pallet", "wrap", "film", "container", "kraft"},
+    }
+
+    tokens = set(re.findall(r"[a-z0-9%]+", combined))
+    for industry, industry_tokens in token_rules.items():
+        overlap = tokens.intersection(industry_tokens)
+        if overlap:
+            scores[industry] += len(overlap) * 2
+
+    # Category-based boosts.
+    category_boosts = {
+        "agri": "agriculture",
+        "agriculture": "agriculture",
+        "textile": "textile",
+        "fabric": "textile",
+        "construction": "construction_material",
+        "building": "construction_material",
+        "mining": "mining_metal",
+        "metal": "mining_metal",
+        "polymer": "polymer_chemical",
+        "petro": "petrochemical",
+        "refinery": "petrochemical",
+        "chemical": "industrial_chemical",
+        "packaging": "packaging",
+    }
+
+    for key, industry in category_boosts.items():
+        if key in category_text:
+            scores[industry] += 4
+
+    if not scores:
+        return "industrial_chemical"
+
+    # Deterministic tie-breaker by priority.
+    priority = [
+        "textile",
+        "mining_metal",
+        "construction_material",
+        "polymer_chemical",
+        "petrochemical",
+        "industrial_chemical",
+        "agriculture",
+        "packaging",
+    ]
+    best_score = max(scores.values())
+    candidates = [industry for industry, score in scores.items() if score == best_score]
+    for industry in priority:
+        if industry in candidates:
+            return industry
+    return candidates[0]
+
+
+@lru_cache(maxsize=512)
+def classify_product_image(title, category):
+    """Return a Flask static URL for the product image based on title/category."""
+    from flask import url_for
+
+    normalized = _normalize_match_text(f"{title or ''} {category or ''}")
+    for product_key in sorted(PRODUCT_IMAGE_MAP.keys(), key=len, reverse=True):
+        if _normalize_match_text(product_key) in normalized:
+            filename = PRODUCT_IMAGE_MAP[product_key]
+            return url_for("static", filename=f"images/products/{filename}")
+
+    industry = classify_product_industry(title, category)
+    filename = INDUSTRY_IMAGE_MAP.get(industry) or "solvent.jpg"
+    return url_for("static", filename=f"images/products/{filename}")
 
 
 class User(UserMixin, db.Model):
@@ -83,32 +273,22 @@ class Product(db.Model):
 
     @property
     def image_url(self):
-        """Return a URL for the product image if present in static/uploads/products,
-        otherwise return a placeholder image URL.
-        """
+        """Return industry-based image URL for marketplace rendering."""
         try:
-            from flask import url_for, current_app
-            import os
+            # Prefer product-id named uploads if present
+            from flask import current_app, url_for
 
-            # Look for common image extensions named by product id
             uploads_dir = os.path.join(current_app.static_folder, "uploads", "products")
-            # Prefer a generated thumbnail if present
-            thumb_name = f"{self.id}_thumb.jpg"
-            thumb_path = os.path.join(uploads_dir, thumb_name)
-            if os.path.exists(thumb_path):
-                return url_for("static", filename=f"uploads/products/{thumb_name}")
-
-            candidates = [f"{self.id}.png", f"{self.id}.jpg", f"{self.id}.jpeg", f"{self.id}.webp", f"{self.id}.svg"]
-            for fname in candidates:
-                path = os.path.join(uploads_dir, fname)
-                if os.path.exists(path):
+            for ext in ("jpg", "jpeg", "png", "webp"):
+                fname = f"{self.id}.{ext}"
+                p = os.path.join(uploads_dir, fname)
+                if os.path.exists(p):
                     return url_for("static", filename=f"uploads/products/{fname}")
 
-            # Fallback placeholder
-            return url_for("static", filename="images/product_placeholder.svg")
+            return classify_product_image(self.title, self.category)
         except Exception:
-            # If not in app context or any error, return a relative path fallback
-            return "/static/images/product_placeholder.svg"
+            # Safe fallback outside app context
+            return "/static/images/products/solvent.jpg"
 
 
 class Trade(db.Model):

@@ -21,6 +21,7 @@ from flask import (
 
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
+from sqlalchemy.orm import joinedload
 
 from app.models import (
     User,
@@ -49,6 +50,23 @@ main_bp = Blueprint("main", __name__)
 _MESSAGE_RATE_LIMIT = {}
 _MESSAGE_RATE_WINDOW = 60
 _MESSAGE_RATE_MAX = 12
+
+
+class ProductListView:
+    """Small pagination-compatible adapter for plain product lists."""
+
+    def __init__(self, items):
+        self.items = items
+        self.total = len(items)
+        self.pages = 1 if items else 0
+        self.page = 1
+        self.has_prev = False
+        self.has_next = False
+        self.prev_num = None
+        self.next_num = None
+
+    def iter_pages(self):
+        return [1] if self.pages else []
 
 
 def get_or_404(model, obj_id):
@@ -244,75 +262,56 @@ def dashboard():
 
 @main_bp.route("/marketplace")
 def marketplace():
-    page = request.args.get("page", 1, type=int)
-    per_page = 9
-
-    search = request.args.get("search", "").strip()
-    selected_category = request.args.get("category", "")
-    selected_country = request.args.get("country", "")
-    selected_verified = request.args.get("verified", "")
-
-    # Base query
-    query = Product.query.join(User)
-
-    # Only active listings
-    query = query.filter(Product.is_active == True)
-
-    # Search
-    if search:
-        like = f"%{search.lower()}%"
-        query = query.filter(
-            db.or_(
-                db.func.lower(Product.title).like(like),
-                db.func.lower(Product.description).like(like),
-                db.func.lower(Product.hs_code).like(like),
-                db.func.lower(Product.category).like(like),
-                db.func.lower(Product.country_of_origin).like(like),
-                db.func.lower(User.company_name).like(like),
-            )
-        )
-
-    # Category filter
-    if selected_category:
-        query = query.filter(Product.category == selected_category)
-
-    # Country filter
-    if selected_country:
-        query = query.filter(Product.country_of_origin == selected_country)
-
-    # Verification filter
-    if selected_verified == "true":
-        query = query.filter(User.is_verified == True)
-    elif selected_verified == "false":
-        query = query.filter(User.is_verified == False)
-
-    # Order newest first
-    query = query.order_by(Product.created_at.desc())
-
-    # Pagination
-    products = query.paginate(page=page, per_page=per_page, error_out=False)
-
-    # Dropdown data
-    categories = [c[0] for c in db.session.query(Product.category).distinct() if c[0]]
-    countries = [c[0] for c in db.session.query(Product.country_of_origin).distinct() if c[0]]
-
-    return render_template(
-        "marketplace.html",
-        products=products,
-        categories=categories,
-        countries=countries,
-        search=search,
-        selected_category=selected_category,
-        selected_country=selected_country,
-        selected_verified=selected_verified,
-    )
+    products = Product.query.filter_by(is_active=True).order_by(Product.created_at.desc()).all()
+    return render_template("marketplace.html", products=ProductListView(products))
 
 
 @main_bp.route("/product/<int:product_id>")
 @login_required
 def product_detail(product_id):
-    product = get_or_404(Product, product_id)
-    return render_template("product_detail.html", product=product)
+    product = Product.query.options(joinedload(Product.seller)).get_or_404(product_id)
+    seller = product.seller
+    placeholder_image = url_for("static", filename="images/product_placeholder.svg")
+
+    try:
+        image_url = product.image_url or placeholder_image
+    except Exception:
+        image_url = placeholder_image
+
+    seller_name = "Unknown Seller"
+    if seller:
+        seller_name = (
+            seller.company_name
+            or seller.full_name
+            or seller.email
+            or "Unknown Seller"
+        )
+
+    product_view = {
+        "product_id": product.id,
+        "seller_id": seller.id if seller else None,
+        "title": product.title or "Unnamed Product",
+        "description": product.description or "No description provided by seller.",
+        "price": product.price_per_unit or 0,
+        "currency": product.currency or "INR",
+        "unit": product.unit or "unit",
+        "moq": product.min_order_quantity or 1,
+        "delivery_terms": product.delivery_terms or "Not specified",
+        "origin": product.country_of_origin or "Not specified",
+        "hs_code": product.hs_code or "N/A",
+        "seller_name": seller_name,
+        "seller_email": seller.email if seller and seller.email else "Not provided",
+        "seller_phone": seller.phone if seller and seller.phone else "Not provided",
+        "seller_member_since": (
+            seller.created_at.strftime("%B %Y")
+            if seller and seller.created_at
+            else "Not available"
+        ),
+        "verified": bool(seller.is_verified) if seller else False,
+        "image": image_url,
+    }
+
+    return render_template("product_detail.html", product_view=product_view)
 
 
 @main_bp.route("/create-trade/<int:product_id>", methods=["GET", "POST"])
@@ -325,16 +324,21 @@ def create_trade(product_id):
         return redirect(url_for("main.marketplace"))
 
     if request.method == "POST":
-        quantity = float(request.form.get("quantity", 0))
+        try:
+            quantity = float(request.form.get("quantity", 0))
+        except (TypeError, ValueError):
+            flash("Please enter a valid quantity.", "error")
+            return render_template("create_trade.html", product=product)
         notes = request.form.get("notes", "")
+        effective_moq = product.min_order_quantity or 1
 
         if quantity <= 0:
             flash("Please enter a valid quantity.", "error")
             return render_template("create_trade.html", product=product)
 
-        if quantity < (product.min_order_quantity or 0):
+        if quantity < effective_moq:
             flash(
-                f"Minimum order quantity is {product.min_order_quantity} {product.unit}.",
+                f"Minimum order quantity is {effective_moq} {product.unit or 'unit'}.",
                 "error",
             )
             return render_template("create_trade.html", product=product)

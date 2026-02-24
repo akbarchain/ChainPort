@@ -4,129 +4,144 @@
 
 {% block content %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/trade_detail.css') }}">
 
 <div class="layout">
 
-    <!-- Sidebar -->
     <aside class="sidebar">
         <h2><a href="{{ url_for('main.dashboard') }}">ChainPort</a></h2>
         <nav>
             <a href="{{ url_for('main.dashboard') }}">Dashboard</a>
-            <a href="{{ url_for('main.trades') }}">My Trades</a>
+            <a href="{{ url_for('main.profile') }}">Business Profile</a>
+            <a href="{{ url_for('main.kyc') }}">KYC Verification</a>
             <a href="{{ url_for('main.marketplace') }}">Marketplace</a>
+            <a class="active" href="{{ url_for('main.trades') }}">My Trades</a>
             <a href="{{ url_for('main.escrow') }}">Escrow Wallet</a>
             <a href="{{ url_for('main.messages') }}">Messages</a>
+            <a href="{{ url_for('main.settings') }}">Settings</a>
             <a class="logout" href="{{ url_for('auth.logout') }}">Logout</a>
         </nav>
     </aside>
 
-    <!-- Main Content -->
     <main class="main">
-
         <header class="topbar">
             <h3>Trade #CP{{ trade.id }}</h3>
-            <span class="status {{ trade.status or 'unknown' }}">{{ (trade.status or 'unknown').replace('_', ' ').title() }}</span>
+            <div class="trade-topbar-meta">
+                <span class="status {{ trade.status or 'unknown' }}">{{ (trade.status or 'unknown').replace('_', ' ').title() }}</span>
+                <span class="trade-created">Created {{ trade.created_at.strftime('%Y-%m-%d %H:%M') if trade.created_at else 'Unknown' }}</span>
+            </div>
         </header>
 
-        <section class="trade-detail-section">
-            <div class="trade-info">
-                <div class="trade-parties">
-                    <div class="party">
-                        <h4>Buyer</h4>
-                        <p>{{ trade.buyer.company_name or trade.buyer.full_name if trade.buyer else 'Unknown Buyer' }}</p>
-                        <p>{{ trade.buyer.email if trade.buyer else 'No email' }}</p>
-                    </div>
-                    <div class="party">
-                        <h4>Seller</h4>
-                        <p>{{ trade.seller.company_name or trade.seller.full_name if trade.seller else 'Unknown Seller' }}</p>
-                        <p>{{ trade.seller.email if trade.seller else 'No email' }}</p>
-                    </div>
-                </div>
+        <section class="trade-page-grid">
+            <div class="trade-main-column">
+                <section class="table-section trade-overview">
+                    <h3>Trade Overview</h3>
+                    <div class="trade-overview-body">
+                        <div class="trade-parties">
+                            <article class="card party">
+                                <h4>Buyer</h4>
+                                <p>{{ (trade.buyer.company_name or trade.buyer.full_name or trade.buyer.email) if trade.buyer else 'Unknown Buyer' }}</p>
+                                <p>{{ trade.buyer.email if trade.buyer else 'No email' }}</p>
+                            </article>
+                            <article class="card party">
+                                <h4>Seller</h4>
+                                <p>{{ (trade.seller.company_name or trade.seller.full_name or trade.seller.email) if trade.seller else 'Unknown Seller' }}</p>
+                                <p>{{ trade.seller.email if trade.seller else 'No email' }}</p>
+                            </article>
+                        </div>
 
-                <div class="trade-details">
-                    <h4>Trade Details</h4>
-                    {% if trade.product %}
-                    <p><strong>Product:</strong> {{ trade.product.title }}</p>
-                    {% endif %}
-                    <p><strong>Quantity:</strong> {{ trade.quantity }} {{ trade.unit or 'units' }}</p>
-                    <p><strong>Unit Price:</strong> &#8377;{{ "%.2f"|format(trade.price_per_unit) }}</p>
-                    <p><strong>Total Amount:</strong> &#8377;{{ "%.2f"|format(trade.total_amount) }}</p>
-                    <p><strong>Currency:</strong> {{ trade.currency or 'INR' }}</p>
-                    {% if trade.payment_terms %}
-                    <p><strong>Payment Terms:</strong> {{ trade.payment_terms }}</p>
-                    {% endif %}
-                    {% if trade.delivery_terms %}
-                    <p><strong>Delivery Terms:</strong> {{ trade.delivery_terms }}</p>
-                    {% endif %}
-                    {% if trade.delivery_date %}
-                    <p><strong>Delivery Date:</strong> {{ trade.delivery_date.strftime('%Y-%m-%d') if trade.delivery_date else 'Not set' }}</p>
-                    {% endif %}
-                    <p><strong>Created:</strong> {{ trade.created_at.strftime('%Y-%m-%d %H:%M') if trade.created_at else 'Unknown' }}</p>
-                </div>
+                        <article class="card trade-details">
+                            <h4>Trade Details</h4>
+                            <div class="trade-kv-grid">
+                                {% if trade.product %}
+                                <p><strong>Product:</strong> {{ trade.product.title }}</p>
+                                {% endif %}
+                                <p><strong>Quantity:</strong> {{ trade.quantity }} {{ trade.unit or 'units' }}</p>
+                                <p><strong>Unit Price:</strong> &#8377;{{ "%.2f"|format(trade.price_per_unit) }}</p>
+                                <p><strong>Total Amount:</strong> &#8377;{{ "%.2f"|format(trade.total_amount) }}</p>
+                                <p><strong>Currency:</strong> {{ trade.currency or 'INR' }}</p>
+                                <p><strong>Payment Terms:</strong> {{ trade.payment_terms or 'Not specified' }}</p>
+                                <p><strong>Delivery Terms:</strong> {{ trade.delivery_terms or 'Not specified' }}</p>
+                                <p><strong>Delivery Date:</strong> {{ trade.delivery_date.strftime('%Y-%m-%d') if trade.delivery_date else 'Not set' }}</p>
+                            </div>
+                        </article>
+
+                        {% if trade.notes %}
+                        <article class="card trade-notes">
+                            <h4>Notes</h4>
+                            <p>{{ trade.notes }}</p>
+                        </article>
+                        {% endif %}
+                    </div>
+                </section>
+            </div>
+
+            <aside class="trade-side-column">
+                <section class="card trade-actions-card">
+                    <h4>Trade Actions</h4>
+                    <div class="trade-actions">
+                        {% if trade.status == 'pending' and trade.buyer_id == current_user.id %}
+                        <button class="btn-primary" data-trade-id="{{ trade.id }}" data-amount="{{ trade.total_amount|tojson }}" onclick="depositEscrow(this)" aria-label="Deposit escrow funds for this trade">Deposit to Escrow</button>
+                        {% endif %}
+
+                        {% if trade.status == 'escrow_deposited' and trade.seller_id == current_user.id %}
+                        <button class="btn-success" data-trade-id="{{ trade.id }}" onclick="releaseEscrow(this)" aria-label="Release escrow funds to buyer">Release Escrow</button>
+                        {% endif %}
+
+                        {% if trade.status in ['pending', 'escrow_deposited'] %}
+                        <button class="btn-warning" data-trade-id="{{ trade.id }}" onclick="updateStatus(this, 'cancelled')" aria-label="Cancel this trade">Cancel Trade</button>
+                        {% endif %}
+                    </div>
+                    <a class="btn-secondary back-link" href="{{ url_for('main.trades') }}">Back to My Trades</a>
+                </section>
 
                 {% if trade.escrow_amount > 0 %}
-                <div class="escrow-info">
-                    <h4>Escrow Information</h4>
+                <section class="card escrow-info">
+                    <h4>Escrow</h4>
                     <p><strong>Escrow Amount:</strong> &#8377;{{ "%.2f"|format(trade.escrow_amount) }}</p>
-                </div>
+                </section>
                 {% endif %}
-
-                {% if trade.notes %}
-                <div class="trade-notes">
-                    <h4>Notes</h4>
-                    <p>{{ trade.notes }}</p>
-                </div>
-                {% endif %}
-            </div>
-
-                {% if trade.status == 'pending' and trade.buyer_id == current_user.id %}
-                <button class="btn-primary" data-trade-id="{{ trade.id }}" data-amount="{{ trade.total_amount|tojson }}" onclick="depositEscrow(this)" aria-label="Deposit escrow funds for this trade">Deposit to Escrow</button>
-                {% endif %}
-
-                {% if trade.status == 'escrow_deposited' and trade.seller_id == current_user.id %}
-                <button class="btn-success" data-trade-id="{{ trade.id }}" onclick="releaseEscrow(this)" aria-label="Release escrow funds to buyer">Release Escrow</button>
-                {% endif %}
-
-                {% if trade.status in ['pending', 'escrow_deposited'] %}
-                <button class="btn-warning" data-trade-id="{{ trade.id }}" onclick="updateStatus(this, 'cancelled')" aria-label="Cancel this trade">Cancel Trade</button>
-                {% endif %}
+            </aside>
         </section>
 
-        <!-- Messages Section -->
-        <section class="messages-section">
-            <h4>Messages</h4>
-
-            <div class="messages-list">
-                {% for message in messages %}
-                <div class="message {{ 'sent' if message.sender_id == current_user.id else 'received' }}">
-                    <div class="message-header">
-                        <strong>{{ message.sender.company_name or message.sender.full_name if message.sender else 'Unknown User' }}</strong>
-                        <span class="timestamp">{{ message.timestamp.strftime('%Y-%m-%d %H:%M') if message.timestamp else 'Unknown Time' }}</span>
+        <section class="table-section messages-section">
+            <h3>Messages</h3>
+            <div class="messages-wrap">
+                <div class="messages-list">
+                    {% if messages %}
+                    {% for message in messages %}
+                    <div class="message {{ 'sent' if message.sender_id == current_user.id else 'received' }}">
+                        <div class="message-header">
+                            <strong>{{ (message.sender.company_name or message.sender.full_name or message.sender.email) if message.sender else 'Unknown User' }}</strong>
+                            <span class="timestamp">{{ message.timestamp.strftime('%Y-%m-%d %H:%M') if message.timestamp else 'Unknown Time' }}</span>
+                        </div>
+                        {% if message.subject %}
+                        <div class="message-subject">{{ message.subject }}</div>
+                        {% endif %}
+                        <div class="message-content">{{ message.content or '' }}</div>
                     </div>
-                    {% if message.subject %}
-                    <div class="message-subject">{{ message.subject }}</div>
+                    {% endfor %}
+                    {% else %}
+                    <p class="messages-empty">No messages yet for this trade.</p>
                     {% endif %}
-                    <div class="message-content">{{ message.content or '' }}</div>
                 </div>
-                {% endfor %}
+
+                <form class="message-form" method="POST" action="{{ url_for('main.send_message') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <input type="hidden" name="receiver_id" value="{{ trade.buyer_id if trade.seller_id == current_user.id else trade.seller_id }}">
+                    <input type="hidden" name="trade_id" value="{{ trade.id }}">
+                    <div class="form-group">
+                        <label for="message-subject">Subject (Optional)</label>
+                        <input type="text" id="message-subject" name="subject" placeholder="Subject (optional)">
+                    </div>
+                    <div class="form-group">
+                        <label for="message-content">Message</label>
+                        <textarea id="message-content" name="content" placeholder="Type your message..." required></textarea>
+                    </div>
+                    <button type="submit" class="btn-primary" aria-label="Send message">Send Message</button>
+                </form>
             </div>
-
-            <form class="message-form" method="POST" action="{{ url_for('main.send_message') }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <input type="hidden" name="receiver_id" value="{{ trade.buyer_id if trade.seller_id == current_user.id else trade.seller_id }}">
-                <input type="hidden" name="trade_id" value="{{ trade.id }}">
-                <div class="form-group">
-                    <label for="message-subject">Subject (Optional)</label>
-                    <input type="text" id="message-subject" name="subject" placeholder="Subject (optional)">
-                </div>
-                <div class="form-group">
-                    <label for="message-content">Message</label>
-                    <textarea id="message-content" name="content" placeholder="Type your message..." required></textarea>
-                </div>
-                <button type="submit" class="btn-primary" aria-label="Send message">Send Message</button>
-            </form>
         </section>
-
     </main>
 </div>
 

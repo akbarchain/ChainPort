@@ -1,13 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}{{ product.title }} | ChainPort{% endblock %}
+{% block title %}{{ product_view.title|default('Unnamed Product', true) }} | ChainPort{% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/marketplace.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/product_detail.css') }}">
 
 <div class="layout">
-
-    <!-- Sidebar -->
     <aside class="sidebar">
         <h2><a href="{{ url_for('main.dashboard') }}">ChainPort</a></h2>
         <nav>
@@ -20,90 +18,116 @@
         </nav>
     </aside>
 
-    <!-- Main -->
     <main class="main">
+        <section class="hero-grid">
+            <article class="card product-image-card">
+                <img
+                    src="{{ product_view.image|default(url_for('static', filename='images/product_placeholder.svg'), true) }}"
+                    alt="{{ product_view.title|default('Product', true) }}"
+                    loading="lazy"
+                    onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/product_placeholder.svg') }}';"
+                >
+            </article>
 
-        <!-- Product Header -->
-        <header class="product-header">
-            <h2>{{ product.title }}</h2>
-            <div class="product-meta">
-                <span class="seller">Sold by: {{ product.seller.company_name or product.seller.email }}</span>
-                <span class="category">{{ product.category or 'Uncategorized' }}</span>
-                {% if product.hs_code %}
-                <span class="hs-code">HS Code: {{ product.hs_code }}</span>
-                {% endif %}
-            </div>
-        </header>
-
-        <!-- Product Details -->
-        <section class="product-details">
-            <div class="product-info">
-                <div class="product-image-large">
-                    <img src="{{ product.image_url }}" alt="{{ product.title }}" loading="lazy"
-                         onerror="this.style.display='none'; this.parentElement.classList.add('fallback')">
-                    <div class="fallback-initial">{{ product.title[:1]|upper }}</div>
-                </div>
-
-                <div class="price-section">
-                    <h3>&#8377;{{ "%.2f"|format(product.price_per_unit) }} per {{ product.unit }}</h3>
-                    {% if product.min_order_quantity %}
-                    <p class="min-order">Minimum Order: {{ product.min_order_quantity }} {{ product.unit }}</p>
+            <article class="card product-info-card">
+                <div class="title-row">
+                    <h1>{{ product_view.title|default('Unnamed Product', true) }}</h1>
+                    {% if product_view.verified|default(false, true) %}
+                    <span class="badge verified">Verified Seller</span>
+                    {% else %}
+                    <span class="badge pending">Verification Pending</span>
                     {% endif %}
                 </div>
-
-                <div class="product-description">
-                    <h4>Description</h4>
-                    <p>{{ product.description or 'No description provided.' }}</p>
-                </div>
-
-                <div class="product-specs">
-                    <h4>Specifications</h4>
-                    <dl>
-                        <dt>Quantity Available:</dt>
-                        <dd>{{ product.quantity }} {{ product.unit }}</dd>
-
-                        <dt>Country of Origin:</dt>
-                        <dd>{{ product.country_of_origin or 'Not specified' }}</dd>
-
-                        <dt>Payment Terms:</dt>
-                        <dd>{{ product.payment_terms or 'Not specified' }}</dd>
-
-                        <dt>Delivery Terms:</dt>
-                        <dd>{{ product.delivery_terms or 'Not specified' }}</dd>
-                    </dl>
-                </div>
-
-                <div class="seller-info">
-                    <h4>About the Seller</h4>
-                    <p><strong>{{ product.seller.company_name or 'Individual Seller' }}</strong></p>
-                    <p>{{ product.seller.email }}</p>
-                    {% if product.seller.phone %}
-                    <p>Phone: {{ product.seller.phone }}</p>
-                    {% endif %}
-                    <p>Member since: {{ product.seller.created_at.strftime('%B %Y') }}</p>
-                </div>
-            </div>
-
-            <div class="product-actions">
-                {% if current_user.id != product.seller_id %}
-                <a href="{{ url_for('main.create_trade', product_id=product.id) }}" class="btn-primary">Request Trade</a>
-                {% else %}
-                <p class="own-product">This is your product listing.</p>
-
-                <!-- Upload form for seller to add/replace product image -->
-                <form method="POST" action="{{ url_for('main.upload_product_image', product_id=product.id) }}" enctype="multipart/form-data" style="margin-top:12px;">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                    <label for="image">Upload product image</label>
-                    <input type="file" id="image" name="image" accept="image/*" required>
-                    <button type="submit" class="btn-secondary">Upload</button>
-                </form>
-
-                {% endif %}
-
-                <a href="{{ url_for('main.marketplace') }}" class="btn-secondary">Back to Marketplace</a>
-            </div>
+                <p class="seller-line">Sold by {{ product_view.seller_name|default('Unknown Seller', true) }}</p>
+                <p class="price-line">
+                    {{ product_view.currency|default('INR', true) }} {{ "%.2f"|format(product_view.price|default(0, true)) }}
+                    <span>per {{ product_view.unit|default('unit', true) }}</span>
+                </p>
+                <p class="moq-line">Minimum order quantity: {{ product_view.moq|default(1, true) }} {{ product_view.unit|default('unit', true) }}</p>
+                <p class="delivery-line">Delivery terms: {{ product_view.delivery_terms|default('Not Provided', true) }}</p>
+            </article>
         </section>
 
+        <section class="detail-grid">
+            <article class="card seller-card">
+                <h2>Seller Information</h2>
+                <div class="meta-list">
+                    <p><span>Name</span><strong>{{ product_view.seller_name|default('Unknown Seller', true) }}</strong></p>
+                    <p><span>Email</span><strong>{{ product_view.seller_email|default('Not Provided', true) }}</strong></p>
+                    <p><span>Phone</span><strong>{{ product_view.seller_phone|default('Not Provided', true) }}</strong></p>
+                    <p><span>Member Since</span><strong>{{ product_view.seller_member_since|default('Not Provided', true) }}</strong></p>
+                </div>
+            </article>
+
+            <article class="card trade-card">
+                <h2>Trade Box</h2>
+                {% if product_view.seller_id|default(none, true) and current_user.id == product_view.seller_id %}
+                <p class="self-warning">You cannot start a trade for your own product listing.</p>
+                {% else %}
+                <form method="POST" action="{{ url_for('main.create_trade', product_id=product_view.product_id|default(0, true)) }}" id="trade-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <label for="quantity">Quantity ({{ product_view.unit|default('unit', true) }})</label>
+                    <input
+                        id="quantity"
+                        name="quantity"
+                        type="number"
+                        min="{{ product_view.moq|default(1, true) }}"
+                        value="{{ product_view.moq|default(1, true) }}"
+                        step="0.01"
+                        required
+                    >
+                    <p id="moq-warning" class="input-warning">
+                        Quantity cannot be less than MOQ ({{ product_view.moq|default(1, true) }} {{ product_view.unit|default('unit', true) }}).
+                    </p>
+
+                    <label for="notes">Trade Notes</label>
+                    <textarea id="notes" name="notes" rows="4" placeholder="Add delivery or compliance requirements (optional)."></textarea>
+
+                    <button type="submit" class="btn-primary">Start Trade</button>
+                </form>
+                {% endif %}
+            </article>
+
+            <article class="card technical-card">
+                <h2>Technical Details</h2>
+                <table>
+                    <tbody>
+                        <tr><th>HS Code</th><td>{{ product_view.hs_code|default('Not Provided', true) }}</td></tr>
+                        <tr><th>Country of Origin</th><td>{{ product_view.origin|default('Not Provided', true) }}</td></tr>
+                        <tr><th>MOQ</th><td>{{ product_view.moq|default(1, true) }} {{ product_view.unit|default('unit', true) }}</td></tr>
+                        <tr><th>Delivery Terms</th><td>{{ product_view.delivery_terms|default('Not Provided', true) }}</td></tr>
+                        <tr><th>Price</th><td>{{ product_view.currency|default('INR', true) }} {{ "%.2f"|format(product_view.price|default(0, true)) }} per {{ product_view.unit|default('unit', true) }}</td></tr>
+                    </tbody>
+                </table>
+            </article>
+        </section>
+
+        <section class="card description-card">
+            <h2>Description</h2>
+            <p>{{ product_view.description|default('Not Provided', true) }}</p>
+        </section>
     </main>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const quantityInput = document.getElementById("quantity");
+    const warning = document.getElementById("moq-warning");
+    if (!quantityInput || !warning) return;
+
+    const minQty = Number(quantityInput.min || 1);
+    const validateQuantity = () => {
+        const value = Number(quantityInput.value || 0);
+        const invalid = Number.isFinite(value) && value < minQty;
+        warning.style.display = invalid ? "block" : "none";
+        quantityInput.setCustomValidity(invalid ? "Quantity must be at least MOQ." : "");
+    };
+
+    validateQuantity();
+    quantityInput.addEventListener("input", validateQuantity);
+});
+</script>
 {% endblock %}
