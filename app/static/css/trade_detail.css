@@ -1,0 +1,223 @@
+.trade-topbar-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.trade-created {
+    font-size: 12px;
+    color: #5f6368;
+}
+
+.trade-page-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+.trade-overview-body {
+    padding: 20px 24px 24px;
+    display: grid;
+    gap: 16px;
+}
+
+.trade-parties {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.trade-details,
+.trade-notes,
+.escrow-info,
+.trade-actions-card,
+.party {
+    margin: 0;
+}
+
+.party h4,
+.trade-details h4,
+.trade-notes h4,
+.escrow-info h4,
+.trade-actions-card h4 {
+    margin: 0 0 10px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #202124;
+}
+
+.party p,
+.trade-details p,
+.trade-notes p,
+.escrow-info p {
+    margin: 0 0 8px;
+    font-size: 14px;
+    color: #3c4043;
+    line-height: 1.45;
+}
+
+.trade-kv-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 16px;
+}
+
+.trade-side-column {
+    display: grid;
+    gap: 16px;
+    align-content: start;
+}
+
+.trade-actions {
+    display: grid;
+    gap: 10px;
+}
+
+.trade-actions .btn-primary,
+.trade-actions .btn-success,
+.trade-actions .btn-warning {
+    margin: 0;
+    width: 100%;
+    min-height: 44px;
+}
+
+.btn-success,
+.btn-warning {
+    border: none;
+    border-radius: 4px;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.btn-success {
+    background: #34a853;
+    color: #fff;
+}
+
+.btn-success:hover {
+    background: #2e7d32;
+}
+
+.btn-warning {
+    background: #ea8600;
+    color: #fff;
+}
+
+.btn-warning:hover {
+    background: #d17a00;
+}
+
+.trade-actions-card .back-link {
+    margin: 12px 0 0;
+    width: 100%;
+    text-decoration: none;
+}
+
+.messages-section {
+    overflow: hidden;
+}
+
+.messages-wrap {
+    display: grid;
+    gap: 14px;
+    padding: 18px 24px 24px;
+}
+
+.messages-list {
+    max-height: 360px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.messages-empty {
+    color: #5f6368;
+    font-size: 14px;
+}
+
+.messages-list .message {
+    border: 1px solid #e8eaed;
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 10px;
+}
+
+.messages-list .message.sent {
+    background: #e8f0fe;
+    margin-left: 56px;
+}
+
+.messages-list .message.received {
+    background: #f8f9fa;
+    margin-right: 56px;
+}
+
+.messages-list .message-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 6px;
+}
+
+.messages-list .timestamp {
+    font-size: 12px;
+    color: #5f6368;
+}
+
+.messages-list .message-subject {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.messages-list .message-content {
+    font-size: 14px;
+    color: #202124;
+    line-height: 1.5;
+}
+
+.message-form {
+    border-top: 1px solid #e8eaed;
+    padding-top: 14px;
+}
+
+.message-form .form-group {
+    margin-bottom: 12px;
+}
+
+.message-form .btn-primary {
+    margin: 4px 0 0;
+}
+
+@media (max-width: 1024px) {
+    .trade-page-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .trade-side-column {
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .trade-topbar-meta {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .trade-parties,
+    .trade-kv-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .messages-wrap {
+        padding: 14px 16px 18px;
+    }
+
+    .messages-list .message.sent,
+    .messages-list .message.received {
+        margin-left: 0;
+        margin-right: 0;
+    }
+}
